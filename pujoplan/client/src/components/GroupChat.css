@@ -1,0 +1,218 @@
+.gc {
+  display: flex;
+  flex-direction: column;
+  height: 480px;
+  background: var(--black-2);
+  border: 1px solid var(--black-4);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  position: relative;
+}
+
+.gc__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  height: 300px;
+  color: var(--gray-mid);
+  font-size: 0.88rem;
+}
+
+.gc__error {
+  margin: var(--s3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+/* ── Feed ────────────────────────── */
+.gc__feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  scroll-behavior: smooth;
+}
+
+.gc__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+  color: var(--gray-mid);
+  padding: var(--s5);
+  gap: var(--s2);
+}
+
+.gc__empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--black-3);
+  border: 1px solid var(--black-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--yellow);
+  margin-bottom: var(--s2);
+}
+
+.gc__empty h4 {
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.gc__empty p {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-width: 260px;
+}
+
+/* ── Bubbles ─────────────────────── */
+.gc__bubble-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+  width: 100%;
+}
+
+.gc__bubble-row--me {
+  justify-content: flex-end;
+}
+
+.gc__bubble-row--other {
+  justify-content: flex-start;
+}
+
+.gc__avatar-wrap {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.gc__avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--black-4);
+}
+
+.gc__avatar--ph {
+  background: var(--black-4);
+  color: var(--yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.gc__bubble {
+  max-width: 78%;
+  padding: 9px 13px;
+  border-radius: var(--r-md);
+  position: relative;
+  word-break: break-word;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.gc__bubble--me {
+  background: linear-gradient(135deg, rgba(245, 197, 24, 0.22) 0%, rgba(204, 34, 34, 0.18) 100%);
+  border: 1px solid rgba(245, 197, 24, 0.35);
+  color: var(--white);
+  border-bottom-right-radius: 4px;
+}
+
+.gc__bubble--other {
+  background: var(--black-3);
+  border: 1px solid var(--black-4);
+  color: var(--white);
+  border-bottom-left-radius: 4px;
+}
+
+.gc__sender-name {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--yellow);
+  margin-bottom: 3px;
+  letter-spacing: 0.02em;
+}
+
+.gc__text {
+  white-space: pre-wrap;
+}
+
+.gc__time {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--gray-mid);
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* ── Input Bar ───────────────────── */
+.gc__input-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--black-3);
+  border-top: 1px solid var(--black-4);
+}
+
+.gc__input {
+  flex: 1;
+  background: var(--black-2);
+  border: 1px solid var(--black-4);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  color: var(--white);
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.gc__input:focus {
+  border-color: var(--yellow);
+}
+
+.gc__send-btn {
+  background: var(--yellow);
+  color: #0a0a0a;
+  border: none;
+  border-radius: var(--r-sm);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s;
+  flex-shrink: 0;
+}
+
+.gc__send-btn:hover:not(:disabled) {
+  background: #ffd84d;
+  transform: scale(1.05);
+}
+
+.gc__send-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.gc__send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -1,0 +1,149 @@
+.landing {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--black);
+  max-width: 480px;
+  margin: 0 auto;
+  font-family: var(--font);
+}
+
+/* ── Maa Durga background ─────────────────── */
+.landing__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.landing__video,
+.landing__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: .95;
+  filter: brightness(0.95);
+}
+
+/* gradient: clear at top → smooth black fade at bottom */
+.landing__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.1) 0%,
+    rgba(0, 0, 0, 0.3) 40%,
+    rgba(0, 0, 0, 0.85) 75%,
+    #000000 100%
+  );
+}
+
+
+/* ── Bottom section (hero + login) ─────── */
+.landing__bottom {
+  position: relative;
+  z-index: 10;
+  margin-top: auto;
+  /* pushes to bottom */
+  padding: var(--s6) var(--s5) calc(var(--s7) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+.landing__headline {
+  font-family: var(--font);
+  font-size: clamp(1.2rem, 5vw, 1.7rem);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: .035em;
+  color: var(--white);
+  text-align: center;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+}
+
+.landing__headline span {
+  font-family: var(--font);
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--yellow);
+}
+
+.landing__sub {
+  font-size: .82rem;
+  color: var(--gray-light);
+  letter-spacing: .02em;
+  margin-top: -4px;
+}
+
+.landing__err {
+  font-size: .82rem;
+}
+
+/* ── Google sign-in button ──────────────── */
+.landing__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  padding: 15px;
+  background: var(--white);
+  color: #111;
+  border-radius: var(--r-sm);
+  font-size: .95rem;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: .04em;
+  border: none;
+  cursor: pointer;
+  transition: var(--ease);
+  margin-top: var(--s2);
+  -webkit-tap-highlight-color: transparent;
+  min-height: 52px;
+}
+
+.landing__btn:hover:not(:disabled) {
+  background: #e8e8e8;
+  transform: translateY(-1px);
+  box-shadow: var(--sh-md);
+}
+
+.landing__btn:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.landing__btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.landing__tos {
+  font-size: .68rem;
+  color: var(--gray);
+  text-align: center;
+}
+
+.landing__cta-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  animation: landingFadeIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes landingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

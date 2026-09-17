@@ -1,0 +1,24 @@
+.join-code {
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.join-code__icon {
+  width: 56px;
+  height: 56px;
+  margin: var(--s3) auto var(--s4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--red);
+  background: var(--red-glow);
+  border: 1px solid var(--black-4);
+  border-radius: 50%;
+}
+
+.join-code h1 { font-size: 1.35rem; }
+.join-code > p { margin: var(--s2) 0 var(--s6); color: var(--gray-light); font-size: .85rem; }
+.join-code form { text-align: left; }
+.join-code label { display: block; margin-bottom: var(--s2); font-size: .78rem; font-weight: 700; }
+.join-code .btn { margin-top: var(--s4); }

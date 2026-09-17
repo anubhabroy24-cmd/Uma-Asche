@@ -1,0 +1,53 @@
+.spd__meta {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  font-size: .78rem; color: var(--gray-mid);
+  margin-bottom: var(--s2);
+}
+
+.spd__spots-head {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+
+.spd__list {
+  display: flex; flex-direction: column;
+  gap: var(--s2);
+}
+
+.spd__spot {
+  display: flex; align-items: center; gap: var(--s3);
+  background: var(--black-2);
+  border: 1.5px solid var(--black-4);
+  border-radius: var(--r-md);
+  padding: var(--s3) var(--s3);
+}
+
+.spd__spot-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--yellow); color: var(--black);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 900; flex-shrink: 0;
+}
+
+.spd__spot-info { flex: 1; min-width: 0; }
+.spd__spot-name {
+  display: block;
+  font-size: .88rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.spd__spot-meta {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  font-size: .7rem; color: var(--gray-mid);
+  align-items: center;
+}
+
+.spd__route-head {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s4);
+}
+
+.spd__route { display: flex; flex-direction: column; gap: var(--s4); }

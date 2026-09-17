@@ -1,0 +1,287 @@
+.app-shell--pure-black {
+  --black: #000000;
+  --black-2: #0c0c0f;
+  --black-3: #16171b;
+  --black-4: #24252c;
+  --black-5: #383942;
+  --gray: #777980;
+  --gray-mid: #9b9da4;
+  --gray-light: #c8c9ce;
+  --white: #f2f2f3;
+  --yellow-glow: rgba(214, 161, 0, .14);
+  --red-glow: rgba(178, 35, 35, .1);
+  background: #000000 !important;
+  color: var(--white);
+}
+
+.app-shell--pure-black .app-main,
+.app-shell--pure-black .page-wrap.db {
+  background: #000000 !important;
+}
+
+.app-shell--pure-black .app-header {
+  background: #000000 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-shell--pure-black .app-header__logo {
+  color: var(--yellow);
+}
+
+.app-shell--pure-black .app-header__back,
+.app-shell--pure-black .app-header__logout {
+  color: var(--gray-light);
+}
+
+.app-shell--pure-black .app-header__back {
+  background: #141416;
+  border-color: #24252c;
+}
+
+.app-shell--pure-black .app-header__title {
+  color: var(--white);
+}
+
+.app-shell--pure-black .btn-ghost {
+  color: var(--gray-light);
+}
+
+/* ── Greeting ─────────────────── */
+.db__greet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding-top: var(--s2);
+  margin-bottom: var(--s5);
+}
+
+.db__name {
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+
+.db__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2.5px solid var(--yellow);
+  flex-shrink: 0;
+}
+
+/* ── Main Hub Buttons ────────────── */
+.db__hub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  margin-top: var(--s3);
+}
+
+.db__hub-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  background: var(--black-2);
+  border: 1.5px solid var(--black-4);
+  border-radius: var(--r-lg);
+  padding: var(--s5) var(--s5);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.db__hub-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--black-5);
+}
+
+.db__hub-card:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.db__hub-card--group {
+  border-left: 4px solid var(--red);
+}
+
+.db__hub-card--group:hover {
+  background: linear-gradient(90deg, rgba(204, 34, 34, 0.08) 0%, var(--black-2) 100%);
+  box-shadow: 0 8px 24px rgba(204, 34, 34, 0.12);
+}
+
+.db__hub-card--solo {
+  border-left: 4px solid var(--yellow);
+}
+
+.db__hub-card--solo:hover {
+  background: linear-gradient(90deg, rgba(245, 197, 24, 0.08) 0%, var(--black-2) 100%);
+  box-shadow: 0 8px 24px rgba(245, 197, 24, 0.12);
+}
+
+.db__hub-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.db__hub-card--group .db__hub-icon {
+  background: var(--red-glow);
+  color: #ff5252;
+  border: 1px solid rgba(255, 82, 82, 0.2);
+}
+
+.db__hub-card--solo .db__hub-icon {
+  background: var(--yellow-glow);
+  color: var(--yellow);
+  border: 1px solid rgba(245, 197, 24, 0.25);
+}
+
+.db__hub-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.db__hub-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+.db__hub-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: -0.01em;
+}
+
+.db__hub-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.db__hub-badge--red {
+  background: rgba(204, 34, 34, 0.2);
+  color: #ff8585;
+  border: 1px solid rgba(204, 34, 34, 0.35);
+}
+
+.db__hub-badge--yellow {
+  background: rgba(245, 197, 24, 0.18);
+  color: #fce881;
+  border: 1px solid rgba(245, 197, 24, 0.3);
+}
+
+.db__hub-subtitle {
+  font-size: 0.82rem;
+  color: var(--gray-mid);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.db__hub-arrow {
+  color: var(--gray-mid);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.db__hub-card:hover .db__hub-arrow {
+  color: var(--white);
+  transform: translateX(3px);
+}
+
+/* ── Quick Actions ─────────────── */
+.db__quick-section {
+  margin-top: var(--s2);
+}
+
+.db__quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+}
+
+@media (max-width: 580px) {
+  .db__quick-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.db__quick-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  background: var(--black-2);
+  border: 1px solid var(--black-4);
+  border-radius: var(--r-md);
+  padding: var(--s3) var(--s3);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gray-light);
+  cursor: pointer;
+  transition: var(--ease);
+}
+
+.db__quick-btn:hover {
+  background: var(--black-3);
+  color: var(--white);
+  border-color: var(--black-5);
+}
+
+.db__quick-btn:active {
+  transform: scale(0.98);
+}
+
+.db__quick-btn-icon {
+  color: var(--yellow);
+  flex-shrink: 0;
+}
+
+/* ── Dashboard Page Wrap (Full Height to Anchor Dhak at Bottom) ── */
+.page-wrap.db {
+  min-height: calc(100vh - var(--header-h));
+  min-height: calc(100dvh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+/* ── Clean Dhak Animation (Anchored at Bottom Position) ── */
+.db__dhak-wrap {
+  width: 100%;
+  margin-top: auto; /* Pushes it all the way down to the bottom */
+  margin-bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+  background: transparent;
+  padding-top: var(--s4);
+}
+
+.db__dhak-video {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  display: block;
+  background: transparent;
+  pointer-events: none;
+  vertical-align: bottom;
+}

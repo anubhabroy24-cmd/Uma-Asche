@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# Environment variables & secrets (CRITICAL)
+.env
+.env.*
+**/.env
+**/.env.*
+*.env
+!.env.example
+!**/.env.example
+*.pem
+serviceAccountKey.json
+*credentials*.json
+firebase-adminsdk*.json
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+**/prisma/*.db
+**/prisma/prisma/*.db
+**/prisma/*.db-journal
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+out/
+**/out/
+
+# Logs
+*.log
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# IDE & Tool caches
+.vscode/
+.idea/
+.qodo/
+.system_generated/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini

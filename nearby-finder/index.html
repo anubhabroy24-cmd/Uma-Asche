@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nearby Finder — Discover Places Around You</title>
+  <meta name="description" content="Find restaurants, bars, public toilets, bus stops and metro stations near you with walking directions." />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="" />
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════ Loading Overlay ═══════ -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner-ring"></div>
+    <p class="loading-text">Searching nearby…</p>
+  </div>
+
+  <!-- ═══════ Toast / Error Banner ═══════ -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- ═══════ Top Control Bar ═══════ -->
+  <header id="control-bar" class="control-bar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg>
+      <h1 class="brand-name">Nearby Finder</h1>
+    </div>
+
+    <!-- Category Filter Chips -->
+    <nav class="chips-row" id="chips-row">
+      <button class="chip" data-category="restaurant" aria-label="Search restaurants">
+        <span class="chip-emoji">🍽️</span> Restaurants
+      </button>
+      <button class="chip" data-category="bar" aria-label="Search bars">
+        <span class="chip-emoji">🍺</span> Bars
+      </button>
+      <button class="chip" data-category="toilets" aria-label="Search public toilets">
+        <span class="chip-emoji">🚻</span> Toilets
+      </button>
+      <button class="chip" data-category="bus_stop" aria-label="Search bus stops">
+        <span class="chip-emoji">🚌</span> Bus Stops
+      </button>
+      <button class="chip" data-category="station" aria-label="Search metro/railway stations">
+        <span class="chip-emoji">🚇</span> Metro / Rail
+      </button>
+    </nav>
+  </header>
+
+  <!-- ═══════ Route Info Panel ═══════ -->
+  <div id="route-panel" class="route-panel hidden">
+    <div class="route-panel-inner">
+      <div class="route-stats">
+        <div class="route-stat">
+          <span class="route-stat-value" id="route-distance">--</span>
+          <span class="route-stat-label">Distance</span>
+        </div>
+        <div class="route-stat">
+          <span class="route-stat-value" id="route-duration">--</span>
+          <span class="route-stat-label">Walking Time</span>
+        </div>
+      </div>
+      <button class="route-close-btn" id="route-close-btn" aria-label="Close route panel">✕</button>
+    </div>
+  </div>
+
+  <!-- ═══════ Recenter FAB ═══════ -->
+  <button id="recenter-btn" class="fab-recenter" aria-label="Recenter on my location" title="Recenter">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+  </button>
+
+  <!-- ═══════ Map Container ═══════ -->
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+
+  <!-- App Scripts (config first so globals are available) -->
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

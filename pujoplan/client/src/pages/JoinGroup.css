@@ -1,0 +1,97 @@
+.join-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s5);
+}
+
+.join-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--black-2);
+  border: 1.5px solid var(--black-4);
+  border-radius: var(--r-lg);
+  padding: var(--s7) var(--s5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.join-logo {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--yellow);
+  letter-spacing: .04em;
+}
+
+.join-icon {
+  font-size: 2.8rem;
+  background: var(--yellow-glow);
+  border: 1.5px solid rgba(245,197,24,.2);
+  border-radius: 50%;
+  width: 68px; height: 68px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.join-icon--err {
+  background: var(--red-glow);
+  border-color: rgba(204,34,34,.2);
+}
+
+.join-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+}
+.join-title span { color: var(--yellow); }
+
+.join-sub {
+  font-size: .82rem;
+  color: var(--gray-light);
+  text-align: center;
+  margin-top: -8px;
+}
+
+.join-info {
+  width: 100%;
+  background: var(--black-3);
+  border: 1.5px solid var(--black-5);
+  border-radius: var(--r-sm);
+  padding: var(--s3) var(--s4);
+}
+
+.join-info__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .85rem;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--black-4);
+}
+.join-info__row:last-child { border-bottom: none; }
+.join-info__row span  { color: var(--gray-light); }
+.join-info__row strong { color: var(--white); }
+
+.join-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  background: var(--white);
+  color: #111;
+  border-radius: var(--r-sm);
+  font-size: .92rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: var(--ease);
+  min-height: 50px;
+}
+.join-google-btn:hover:not(:disabled) { background: #e8e8e8; }
+.join-google-btn:disabled { opacity: .55; cursor: not-allowed; }
