@@ -293,12 +293,6 @@ export default function PandalMapExplorer({
           <button class="popup-btn popup-btn-directions" id="btn-route-${pandal.id || pandal.name}">
             🚶 Walking Directions
           </button>
-          <a class="popup-btn" style="background:#1a73e8; color:#fff; text-decoration:none; text-align:center; display:flex; align-items:center; justify-content:center; gap:5px; font-weight:600; margin-top:4px;"
-             href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
-             target="_blank" rel="noopener noreferrer">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-            Open in Google Maps
-          </a>
         </div>
       `;
 

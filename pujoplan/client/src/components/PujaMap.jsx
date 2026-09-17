@@ -1,38 +1,96 @@
-import React, {
-  useEffect, useRef, useState, useCallback,
-  forwardRef, useImperativeHandle
-} from 'react';
-import { Crosshair, Maximize2, Navigation, Key, ExternalLink, X } from 'lucide-react';
+import React, { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
+import { Crosshair, Maximize2 } from 'lucide-react';
 
-const GOOGLE_MAPS_DARK_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#212121' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
-  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#757575' }] },
-  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
-  { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#bdbdbd' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#181818' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.stroke', stylers: [{ color: '#1b1b1b' }] },
-  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2c2c2c' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
-  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#373737' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3c3c3c' }] },
-  { featureType: 'road.highway.controlled_access', elementType: 'geometry', stylers: [{ color: '#4e4e4e' }] },
-  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
-  { featureType: 'transit', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3d3d3d' }] },
-];
+// Fix default marker icons in Vite
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+// Custom SVG Teardrop Pin (Google Maps style)
+function createSvgTeardropPin(label, isStart = false) {
+  const pinColor = isStart ? '#1a73e8' : '#EA4335';
+  return L.divIcon({
+    className: 'gmaps-teardrop-marker-div',
+    html: `
+      <div class="gmaps-teardrop-pin">
+        <svg viewBox="0 0 32 44" width="30" height="42" class="gmaps-teardrop-svg">
+          <defs>
+            <filter id="shadow-${label}-${isStart ? 's' : 'p'}" x="-20%" y="-10%" width="140%" height="130%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.5"/>
+            </filter>
+          </defs>
+          <path d="M16 0C7.163 0 0 7.163 0 16c0 11.2 14.5 26.8 15.15 27.5a1.15 1.15 0 0 0 1.7 0C17.5 42.8 32 27.2 32 16 32 7.163 24.837 0 16 0z"
+                fill="${pinColor}" filter="url(#shadow-${label}-${isStart ? 's' : 'p'})"/>
+          <circle cx="16" cy="16" r="8.5" fill="#ffffff"/>
+          <text x="16" y="20" font-family="'Roboto', 'Google Sans', Inter, sans-serif" font-size="${String(label).length > 2 ? '8.5' : '10.5'}" font-weight="900" fill="${pinColor}" text-anchor="middle">${label}</text>
+        </svg>
+      </div>
+    `,
+    iconSize: [30, 42],
+    iconAnchor: [15, 41],
+    popupAnchor: [0, -40],
+  });
+}
+
+// Custom DivIcon: solid 14px blue dot with white border & CSS keyframe ring that pulses outward every ~2s
+function createMyLocationDivIcon() {
+  return L.divIcon({
+    className: 'gmaps-mylocation-divicon',
+    html: `
+      <div class="gmaps-bluedot-host">
+        <div class="gmaps-bluedot-pulse-ring"></div>
+        <div class="gmaps-bluedot-solid"></div>
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
+  });
+}
+
+// Group Member Circular Avatar Pin
+function createMemberAvatarIcon(member) {
+  const initial = member.name?.[0]?.toUpperCase() || 'U';
+  return L.divIcon({
+    className: 'gmaps-member-avatar-div',
+    html: `
+      <div class="gmaps-avatar-pin-container">
+        <div class="gmaps-avatar-pin-bubble">
+          ${member.profileImage
+        ? `<img src="${member.profileImage}" class="gmaps-avatar-pin-img" alt="${member.name}" />`
+        : `<span class="gmaps-avatar-pin-initial">${initial}</span>`
+      }
+          <span class="gmaps-avatar-pin-dot"></span>
+        </div>
+        <div class="gmaps-avatar-pin-tail"></div>
+      </div>
+    `,
+    iconSize: [36, 44],
+    iconAnchor: [18, 42],
+    popupAnchor: [0, -40],
+  });
+}
+
+function formatUpdatedAgo(dateStr) {
+  if (!dateStr) return 'Active now';
+  const sec = Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000));
+  if (sec < 60) return `last updated ${sec}s ago`;
+  if (sec < 3600) return `last updated ${Math.floor(sec / 60)}m ago`;
+  return `last updated ${Math.floor(sec / 3600)}h ago`;
+}
 
 const PujaMap = forwardRef(function PujaMap({
   routeData = null,
   waypoints = [],
   onWaypointsChange,
-  myLocation = null,
+  myLocation = null, // { latitude, longitude, accuracy }
   liveMembers = [],
   currentUserId,
   centerTarget = null,
@@ -40,28 +98,23 @@ const PujaMap = forwardRef(function PujaMap({
   onError,
   height = 420,
 }, ref) {
-  const mapContainerRef = useRef(null);
-  const googleMapInstanceRef = useRef(null);
-  const markersRef = useRef([]);
-  const polylinesRef = useRef([]);
-  const infoWindowRef = useRef(null);
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const routeLayerRef = useRef(null);
+  const stopMarkersLayerRef = useRef(null);
+  const userToStartRouteLayerRef = useRef(null);
+  const amenitiesLayerRef = useRef(null);
+  const myLocationMarkerRef = useRef(null);
+  const myLocationAccuracyRef = useRef(null);
+  const membersLayerRef = useRef(null);
 
-  // Key state: Check environment or localStorage
-  const [apiKey, setApiKey] = useState(() => {
-    return import.meta.env.VITE_GOOGLE_MAPS_API_KEY || localStorage.getItem('pp_gmaps_api_key') || '';
-  });
-  const [isJsSdkLoaded, setIsJsSdkLoaded] = useState(false);
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [keyInput, setKeyInput] = useState(apiKey);
-  const [keyError, setKeyError] = useState('');
-
-  // Extract effective waypoints
+  // Derive waypoints if routeData is passed instead
   const effectiveWaypoints = (waypoints && waypoints.length > 0)
     ? waypoints
     : (routeData?.stops && routeData?.start)
       ? [
         {
-          name: routeData.start.name || 'Start Point',
+          name: routeData.start.name || 'Start',
           lat: routeData.start.coords?.[0] || 22.5726,
           lng: routeData.start.coords?.[1] || 88.3639,
         },
@@ -73,448 +126,397 @@ const PujaMap = forwardRef(function PujaMap({
       ]
       : [];
 
-  const centerCoord = effectiveWaypoints.length > 0
-    ? { lat: Number(effectiveWaypoints[0].lat), lng: Number(effectiveWaypoints[0].lng) }
-    : { lat: 22.5726, lng: 88.3639 }; // Kolkata center
+  // Helper to draw the two stacked polylines: white 10px base under #4285F4 blue 6px top
+  const drawRouteLines = useCallback((latLngs) => {
+    if (!routeLayerRef.current) return;
+    routeLayerRef.current.clearLayers();
 
-  // Build full Google Maps directions URL for all waypoints
-  const getGoogleMapsDirectionsUrl = () => {
-    if (effectiveWaypoints.length === 0) {
-      return `https://www.google.com/maps?q=Kolkata+Durga+Puja`;
-    }
-    if (effectiveWaypoints.length === 1) {
-      const p = effectiveWaypoints[0];
-      return `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`;
-    }
-    const origin = `${effectiveWaypoints[0].lat},${effectiveWaypoints[0].lng}`;
-    const destination = `${effectiveWaypoints[effectiveWaypoints.length - 1].lat},${effectiveWaypoints[effectiveWaypoints.length - 1].lng}`;
-    const intermediates = effectiveWaypoints.slice(1, -1).map(w => `${w.lat},${w.lng}`).join('|');
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-    if (intermediates) {
-      url += `&waypoints=${encodeURIComponent(intermediates)}`;
-    }
-    return url;
-  };
+    if (!latLngs || latLngs.length < 2) return;
 
-  // ── 1. Dynamic Google Maps JavaScript SDK Loader ──
+    // 1. White 10px base under line with rounded caps
+    L.polyline(latLngs, {
+      color: '#ffffff',
+      weight: 10,
+      opacity: 1,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(routeLayerRef.current);
+
+    // 2. #4285F4 blue 6px line on top with rounded caps
+    L.polyline(latLngs, {
+      color: '#4285F4',
+      weight: 6,
+      opacity: 1,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(routeLayerRef.current);
+  }, []);
+
+  // Helper to draw RED route line specifically from logged-in user's own location to start point
+  const drawUserToStartRouteLines = useCallback((latLngs) => {
+    if (!userToStartRouteLayerRef.current) return;
+    userToStartRouteLayerRef.current.clearLayers();
+
+    if (!latLngs || latLngs.length < 2) return;
+
+    // 1. White 8px base underlay
+    L.polyline(latLngs, {
+      color: '#ffffff',
+      weight: 8,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(userToStartRouteLayerRef.current);
+
+    // 2. Vibrant RED (#EA4335) 5px line from User's location to Start Point
+    L.polyline(latLngs, {
+      color: '#EA4335',
+      weight: 5,
+      opacity: 1,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(userToStartRouteLayerRef.current);
+  }, []);
+
+  // Helper to draw custom SVG teardrop stop markers (Static & Fixed)
+  const drawStopMarkers = useCallback((points) => {
+    if (!stopMarkersLayerRef.current) return;
+    stopMarkersLayerRef.current.clearLayers();
+
+    points.forEach((wp, i) => {
+      if (!wp || isNaN(Number(wp.lat)) || isNaN(Number(wp.lng))) return;
+      const isStart = i === 0;
+      const marker = L.marker([Number(wp.lat), Number(wp.lng)], {
+        icon: createSvgTeardropPin(isStart ? 'S' : i, isStart),
+        draggable: false, // Map pins are static to prevent accidental relocation on touch
+        zIndexOffset: isStart ? 1100 : 1000 - i,
+      });
+
+      marker.bindPopup(
+        `<div style="font-family:Roboto,sans-serif; padding: 2px;">
+          <strong style="color:#ea4335; font-size: 13px;">${isStart ? '🚩 START LOCATION' : `📍 STOP #${i}`}</strong><br/>
+          <span style="font-weight: 600; color: #fff; font-size: 13px;">${wp.name || 'Pandal Stop'}</span>
+        </div>`
+      );
+
+      stopMarkersLayerRef.current.addLayer(marker);
+    });
+  }, []);
+
+  // ── 1. Initialize Leaflet Map with CartoDB Dark Tiles ──
   useEffect(() => {
-    if (!apiKey || isJsSdkLoaded) return;
+    if (!mapRef.current || mapInstanceRef.current) return;
 
-    // If already on window
-    if (window.google && window.google.maps) {
-      setIsJsSdkLoaded(true);
+    const map = L.map(mapRef.current, {
+      center: [22.5726, 88.3639],
+      zoom: 13,
+      zoomControl: false,
+    });
+
+    // 100% Free OpenStreetMap tiles with Google Maps Dark Theme styling (Zero API key, zero watermarks)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:
+        '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      className: 'gmaps-dark-tiles',
+    }).addTo(map);
+
+    // Zoom control in top-right
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Dedicated layers for route and markers
+    routeLayerRef.current = L.layerGroup().addTo(map);
+    userToStartRouteLayerRef.current = L.layerGroup().addTo(map);
+    stopMarkersLayerRef.current = L.layerGroup().addTo(map);
+    amenitiesLayerRef.current = L.layerGroup().addTo(map);
+    membersLayerRef.current = L.layerGroup().addTo(map);
+
+    // Invalidate size once after mount to ensure seamless tile display
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 250);
+
+    mapInstanceRef.current = map;
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []); // Run once on mount
+
+  const onRouteSummaryRef = useRef(onRouteSummary);
+  onRouteSummaryRef.current = onRouteSummary;
+
+  const onWaypointsChangeRef = useRef(onWaypointsChange);
+  onWaypointsChangeRef.current = onWaypointsChange;
+
+  const lastRenderedKeyRef = useRef('');
+
+  // ── 2. Render Route Lines & Driving Directions (Flicker-Free) ──
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const validWaypoints = effectiveWaypoints.filter(
+      (w) => w && !isNaN(Number(w.lat)) && !isNaN(Number(w.lng))
+    );
+
+    // Compute stable coordinate serialization key
+    const currentKey = validWaypoints.map(w => `${Number(w.lat).toFixed(4)},${Number(w.lng).toFixed(4)}`).join('|');
+    if (currentKey === lastRenderedKeyRef.current && currentKey !== '') {
+      return; // Waypoint coordinates haven't changed, skip re-rendering to prevent any flicker
+    }
+    lastRenderedKeyRef.current = currentKey;
+
+    // 1. Draw all teardrop markers
+    drawStopMarkers(validWaypoints);
+
+    if (validWaypoints.length < 2) {
+      if (routeLayerRef.current) routeLayerRef.current.clearLayers();
       return;
     }
 
-    const scriptId = 'google-maps-js-sdk';
-    let script = document.getElementById(scriptId);
-    if (!script) {
-      script = document.createElement('script');
-      script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=geometry,places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        setIsJsSdkLoaded(true);
-      };
-      script.onerror = () => {
-        setKeyError('Failed to load Google Maps JS SDK with this key.');
-      };
-      document.head.appendChild(script);
+    // 2. Query high-accuracy driving road geometry via OSRM
+    const coordStr = validWaypoints.map((w) => `${Number(w.lng)},${Number(w.lat)}`).join(';');
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+
+    fetch(osrmUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`OSRM HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        const route = data.routes && data.routes[0];
+        if (route && route.geometry && route.geometry.coordinates) {
+          const roadLatLngs = route.geometry.coordinates.map((c) => [c[1], c[0]]);
+          drawRouteLines(roadLatLngs);
+
+          try {
+            map.fitBounds(roadLatLngs, { padding: [55, 55], maxZoom: 15 });
+          } catch (_) { }
+
+          if (onRouteSummaryRef.current) {
+            onRouteSummaryRef.current({
+              totalDistanceKm: (route.distance / 1000).toFixed(1),
+              estimatedDurationMin: Math.round(route.duration / 60),
+            });
+          }
+        } else {
+          const straightCoords = validWaypoints.map((w) => [Number(w.lat), Number(w.lng)]);
+          drawRouteLines(straightCoords);
+        }
+      })
+      .catch((err) => {
+        const straightCoords = validWaypoints.map((w) => [Number(w.lat), Number(w.lng)]);
+        drawRouteLines(straightCoords);
+      });
+  }, [effectiveWaypoints, drawRouteLines, drawStopMarkers]);
+
+  // ── 3. Current Location: 14px Blue Dot + 2s Pulsing Ring + Accuracy Circle ──
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!myLocation || !myLocation.latitude || !myLocation.longitude) {
+      if (myLocationMarkerRef.current) {
+        map.removeLayer(myLocationMarkerRef.current);
+        myLocationMarkerRef.current = null;
+      }
+      if (myLocationAccuracyRef.current) {
+        map.removeLayer(myLocationAccuracyRef.current);
+        myLocationAccuracyRef.current = null;
+      }
+      return;
+    }
+
+    const latLng = [myLocation.latitude, myLocation.longitude];
+
+    // Create or update blue dot marker
+    if (!myLocationMarkerRef.current) {
+      const marker = L.marker(latLng, {
+        icon: createMyLocationDivIcon(),
+        zIndexOffset: 2000,
+      }).addTo(map);
+      marker.bindPopup(`<strong>Your Location</strong><br/>Live GPS Position`);
+      myLocationMarkerRef.current = marker;
     } else {
-      script.onload = () => setIsJsSdkLoaded(true);
-    }
-  }, [apiKey, isJsSdkLoaded]);
-
-  // ── 2. Initialize Google Maps instance when SDK is loaded ──
-  useEffect(() => {
-    if (!isJsSdkLoaded || !mapContainerRef.current || !window.google?.maps) return;
-
-    try {
-      const map = new window.google.maps.Map(mapContainerRef.current, {
-        center: centerCoord,
-        zoom: 13,
-        styles: GOOGLE_MAPS_DARK_STYLE,
-        disableDefaultUI: false,
-        zoomControl: true,
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        gestureHandling: 'greedy',
-      });
-
-      googleMapInstanceRef.current = map;
-      infoWindowRef.current = new window.google.maps.InfoWindow();
-    } catch (e) {
-      console.warn('Google Maps JS Map creation error:', e);
-    }
-  }, [isJsSdkLoaded]);
-
-  // ── 3. Render Static Markers & Route in Google Maps SDK ──
-  useEffect(() => {
-    const map = googleMapInstanceRef.current;
-    if (!map || !window.google?.maps) return;
-
-    // Clear old markers
-    markersRef.current.forEach(m => m.setMap(null));
-    markersRef.current = [];
-
-    // Clear old polylines
-    polylinesRef.current.forEach(p => p.setMap(null));
-    polylinesRef.current = [];
-
-    if (effectiveWaypoints.length === 0) return;
-
-    const bounds = new window.google.maps.LatLngBounds();
-    const routeCoords = [];
-
-    // Render Stop Markers
-    effectiveWaypoints.forEach((wp, i) => {
-      const pos = { lat: Number(wp.lat), lng: Number(wp.lng) };
-      if (isNaN(pos.lat) || isNaN(pos.lng)) return;
-
-      bounds.extend(pos);
-      routeCoords.push(pos);
-
-      const isStart = i === 0;
-      const marker = new window.google.maps.Marker({
-        position: pos,
-        map,
-        title: wp.name,
-        draggable: false, // Static & touch-proof
-        label: {
-          text: isStart ? 'S' : String(i),
-          color: '#ffffff',
-          fontWeight: '900',
-          fontSize: '12px',
-        },
-        icon: {
-          path: 'M12 0C7.03 0 3 4.03 3 9c0 5.25 7.05 14.25 8.19 14.85.48.25 1.14.25 1.62 0C13.95 23.25 21 14.25 21 9c0-4.97-4.03-9-9-9z',
-          fillColor: isStart ? '#1a73e8' : '#ea4335',
-          fillOpacity: 1,
-          strokeWeight: 1.5,
-          strokeColor: '#ffffff',
-          scale: 1.6,
-          anchor: new window.google.maps.Point(12, 24),
-          labelOrigin: new window.google.maps.Point(12, 9),
-        },
-      });
-
-      marker.addListener('click', () => {
-        if (!infoWindowRef.current) return;
-        infoWindowRef.current.setContent(`
-          <div style="color:#202124; font-family:Roboto,sans-serif; padding:4px;">
-            <strong style="color:${isStart ? '#1a73e8' : '#ea4335'}; font-size:12px;">
-              ${isStart ? '🚩 START LOCATION' : `📍 STOP #${i}`}
-            </strong><br/>
-            <div style="font-weight:700; font-size:13px; margin:2px 0 6px;">${wp.name || 'Pandal Stop'}</div>
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${pos.lat},${pos.lng}"
-               target="_blank" rel="noopener noreferrer"
-               style="display:inline-block; background:#1a73e8; color:#fff; padding:4px 8px; border-radius:4px; font-size:11px; text-decoration:none; font-weight:600;">
-               Open in Google Maps
-            </a>
-          </div>
-        `);
-        infoWindowRef.current.open(map, marker);
-      });
-
-      markersRef.current.push(marker);
-    });
-
-    // Draw Google Maps Route Polyline
-    if (routeCoords.length >= 2) {
-      // 1. White border outline
-      const baseLine = new window.google.maps.Polyline({
-        path: routeCoords,
-        geodesic: true,
-        strokeColor: '#ffffff',
-        strokeOpacity: 0.9,
-        strokeWeight: 8,
-        map,
-      });
-      polylinesRef.current.push(baseLine);
-
-      // 2. Google Maps Classic Blue Navigation line
-      const navLine = new window.google.maps.Polyline({
-        path: routeCoords,
-        geodesic: true,
-        strokeColor: '#4285F4',
-        strokeOpacity: 1.0,
-        strokeWeight: 5,
-        map,
-      });
-      polylinesRef.current.push(navLine);
+      myLocationMarkerRef.current.setLatLng(latLng);
     }
 
-    // Auto fit bounds
-    if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
-    }
-  }, [effectiveWaypoints, isJsSdkLoaded]);
-
-  // Recenter controls
-  const handleRecenterMe = useCallback(() => {
-    if (googleMapInstanceRef.current && myLocation) {
-      googleMapInstanceRef.current.panTo({
-        lat: Number(myLocation.latitude),
-        lng: Number(myLocation.longitude),
-      });
-      googleMapInstanceRef.current.setZoom(16);
+    // Faint accuracy radius circle
+    const acc = myLocation.accuracy || 30;
+    if (!myLocationAccuracyRef.current) {
+      const circle = L.circle(latLng, {
+        radius: acc,
+        color: '#4285f4',
+        weight: 1,
+        opacity: 0.35,
+        fillColor: '#4285f4',
+        fillOpacity: 0.07,
+      }).addTo(map);
+      myLocationAccuracyRef.current = circle;
+    } else {
+      myLocationAccuracyRef.current.setLatLng(latLng);
+      myLocationAccuracyRef.current.setRadius(acc);
     }
   }, [myLocation]);
 
-  const handleFitRoute = useCallback(() => {
-    if (!googleMapInstanceRef.current || !window.google?.maps || effectiveWaypoints.length === 0) return;
-    const bounds = new window.google.maps.LatLngBounds();
-    effectiveWaypoints.forEach(w => bounds.extend({ lat: Number(w.lat), lng: Number(w.lng) }));
-    googleMapInstanceRef.current.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
-  }, [effectiveWaypoints]);
+  // ── 3B. Route from User's Current Location to Starting Point in RED ──
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !userToStartRouteLayerRef.current) return;
+
+    if (!myLocation?.latitude || !myLocation?.longitude || effectiveWaypoints.length === 0) {
+      userToStartRouteLayerRef.current.clearLayers();
+      return;
+    }
+
+    const startPoint = effectiveWaypoints[0];
+    if (!startPoint || isNaN(Number(startPoint.lat)) || isNaN(Number(startPoint.lng))) {
+      userToStartRouteLayerRef.current.clearLayers();
+      return;
+    }
+
+    const uLat = Number(myLocation.latitude);
+    const uLng = Number(myLocation.longitude);
+    const sLat = Number(startPoint.lat);
+    const sLng = Number(startPoint.lng);
+
+    // If user is within 35m of start point, no route needed
+    const dLat = (sLat - uLat) * 111000;
+    const dLng = (sLng - uLng) * 111000 * Math.cos((uLat * Math.PI) / 180);
+    const distMeters = Math.sqrt(dLat * dLat + dLng * dLng);
+
+    if (distMeters < 35) {
+      userToStartRouteLayerRef.current.clearLayers();
+      return;
+    }
+
+    // Immediately render straight line while road query resolves
+    drawUserToStartRouteLines([[uLat, uLng], [sLat, sLng]]);
+
+    // Fetch turn-by-turn driving road path from User's location to Starting Point
+    const coordStr = `${uLng},${uLat};${sLng},${sLat}`;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+
+    fetch(osrmUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`OSRM HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        const route = data.routes && data.routes[0];
+        if (route && route.geometry && route.geometry.coordinates) {
+          const roadLatLngs = route.geometry.coordinates.map((c) => [c[1], c[0]]);
+          drawUserToStartRouteLines(roadLatLngs);
+        }
+      })
+      .catch(() => {
+        // Keeps fallback straight line
+      });
+  }, [myLocation?.latitude, myLocation?.longitude, effectiveWaypoints, drawUserToStartRouteLines]);
+
+  // ── 4. Group Members: Circular Avatar Pins + "last updated Xs ago" Tooltip ──
+  useEffect(() => {
+    if (!membersLayerRef.current) return;
+    membersLayerRef.current.clearLayers();
+
+    liveMembers.forEach((m) => {
+      // Exclude self since self is the Blue Dot
+      if (m.userId === currentUserId || !m.isSharingLocation || !m.latitude || !m.longitude) return;
+
+      const marker = L.marker([m.latitude, m.longitude], {
+        icon: createMemberAvatarIcon(m),
+        zIndexOffset: 1500,
+      });
+
+      // Tooltip showing "last updated Xs ago"
+      marker.bindTooltip(
+        `<div class="gmaps-tooltip-content">
+          <strong>${m.name}</strong><br/>
+          <span>${formatUpdatedAgo(m.lastLocationUpdate)}</span>
+        </div>`,
+        {
+          permanent: false,
+          direction: 'top',
+          offset: [0, -42],
+          className: 'gmaps-dark-tooltip',
+        }
+      );
+
+      marker.bindPopup(
+        `<div style="font-family:Roboto,sans-serif;">
+          <strong style="color:#8ab4f8;">${m.name}</strong><br/>
+          <span style="color:#34a853;">● Sharing live location</span><br/>
+          <small style="color:#aaa;">${formatUpdatedAgo(m.lastLocationUpdate)}</small>
+        </div>`
+      );
+
+      membersLayerRef.current.addLayer(marker);
+    });
+  }, [liveMembers, currentUserId]);
+
+  // ── 5. Center Target Listener ─────────────────────
+  useEffect(() => {
+    if (centerTarget && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo(centerTarget, 16, { duration: 0.9 });
+    }
+  }, [centerTarget]);
+
+  // Recenter on My Location
+  const handleRecenterMe = () => {
+    if (myLocation?.latitude && myLocation?.longitude && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([myLocation.latitude, myLocation.longitude], 16, { duration: 0.8 });
+    } else if (waypoints.length > 0 && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([waypoints[0].lat, waypoints[0].lng], 15, { duration: 0.8 });
+    }
+  };
+
+  // Fit Entire Route Bounds
+  const handleFitRoute = () => {
+    if (!mapInstanceRef.current || waypoints.length === 0) return;
+    const bounds = waypoints.filter((w) => w && w.lat && w.lng).map((w) => [w.lat, w.lng]);
+    if (myLocation?.latitude) bounds.push([myLocation.latitude, myLocation.longitude]);
+    if (bounds.length > 0) {
+      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+    }
+  };
 
   useImperativeHandle(ref, () => ({
     recenterMe: handleRecenterMe,
     fitRoute: handleFitRoute,
   }));
 
-  const handleSaveKey = (e) => {
-    e.preventDefault();
-    const clean = keyInput.trim();
-    if (clean) {
-      localStorage.setItem('pp_gmaps_api_key', clean);
-      setApiKey(clean);
-      setShowKeyModal(false);
-      setKeyError('');
-    }
-  };
-
-  // Google Maps Embed URL for when JS SDK key is not provided
-  const embedUrl = effectiveWaypoints.length > 1
-    ? `https://maps.google.com/maps?saddr=${effectiveWaypoints[0].lat},${effectiveWaypoints[0].lng}&daddr=${effectiveWaypoints[effectiveWaypoints.length - 1].lat},${effectiveWaypoints[effectiveWaypoints.length - 1].lng}&z=13&output=embed`
-    : `https://maps.google.com/maps?q=${centerCoord.lat},${centerCoord.lng}&z=14&output=embed`;
-
   return (
-    <div className="gmaps-navigation-container" style={{ position: 'relative', width: '100%', height, background: '#121212', borderRadius: '12px', overflow: 'hidden' }}>
-      {/* ── Mode A: Google Maps JavaScript SDK (Active when Key is present) ── */}
-      {apiKey && (
-        <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
-      )}
+    <div className="gmaps-navigation-container" style={{ position: 'relative', width: '100%', height }}>
+      {/* Map DOM Element */}
+      <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* ── Mode B: Interactive Google Maps Live Fallback (Active when Key not yet set) ── */}
-      {!apiKey && (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-          <iframe
-            title="Google Maps Route View"
-            src={embedUrl}
-            width="100%"
-            height="100%"
-            style={{ border: 0, display: 'block', filter: 'invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-
-          {/* Google Maps Floating Controls Pill */}
-          <div style={{
-            position: 'absolute',
-            top: '12px',
-            left: '12px',
-            right: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '8px',
-            background: 'rgba(15, 15, 18, 0.92)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            borderRadius: '10px',
-            padding: '6px 10px',
-            zIndex: 10,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#4285F4' }}>Google Maps</span>
-              <span style={{ fontSize: '10px', color: '#a1a1aa' }}>• Interactive</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <a
-                href={getGoogleMapsDirectionsUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: '#1a73e8',
-                  color: '#fff',
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  padding: '5px 9px',
-                  borderRadius: '6px',
-                  textDecoration: 'none',
-                }}
-              >
-                <Navigation size={12} />
-                Open Live Maps
-                <ExternalLink size={10} />
-              </a>
-
-              <button
-                type="button"
-                onClick={() => setShowKeyModal(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#f59e0b',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  padding: '5px 8px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                }}
-                title="Add Google Maps JS API Key"
-              >
-                <Key size={12} /> Key
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Recenter Controls (For JS SDK mode) */}
-      {apiKey && (
-        <div style={{ position: 'absolute', bottom: '16px', right: '16px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 5 }}>
-          <button
-            type="button"
-            className="gmaps-map-fab"
-            onClick={handleRecenterMe}
-            title="Recenter on my location"
-            style={{
-              width: '38px', height: '38px', borderRadius: '50%',
-              background: '#1e1e24', border: '1px solid rgba(255,255,255,0.15)',
-              color: '#4285F4', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-            }}
-          >
-            <Crosshair size={18} />
-          </button>
-          <button
-            type="button"
-            className="gmaps-map-fab"
-            onClick={handleFitRoute}
-            title="Fit whole route"
-            style={{
-              width: '38px', height: '38px', borderRadius: '50%',
-              background: '#1e1e24', border: '1px solid rgba(255,255,255,0.15)',
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-            }}
-          >
-            <Maximize2 size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* API Key Entry Modal */}
-      {showKeyModal && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.85)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px',
-        }}>
-          <form
-            onSubmit={handleSaveKey}
-            style={{
-              width: '100%',
-              maxWidth: '360px',
-              background: '#18181b',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '14px',
-              padding: '16px',
-              boxShadow: '0 16px 36px rgba(0,0,0,0.7)',
-              color: '#fff',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '700', fontSize: '13px' }}>
-                <Key size={14} color="#f59e0b" />
-                <span>Google Maps API Key</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowKeyModal(false)}
-                style={{ background: 'transparent', border: 'none', color: '#a1a1aa', cursor: 'pointer' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '10px', lineHeight: '1.4' }}>
-              Paste your Google Maps JavaScript API key to enable native Google Maps markers and live geometry rendering:
-            </p>
-
-            <input
-              type="text"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="AIzaSy..."
-              style={{
-                width: '100%',
-                background: 'rgba(0, 0, 0, 0.4)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                color: '#fff',
-                fontSize: '12px',
-                marginBottom: '10px',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-
-            {keyError && <p style={{ color: '#f87171', fontSize: '11px', marginBottom: '8px' }}>{keyError}</p>}
-
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setShowKeyModal(false)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: 'none',
-                  color: '#d4d4d8',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                style={{
-                  background: '#1a73e8',
-                  border: 'none',
-                  color: '#fff',
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                }}
-              >
-                Save & Load
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Floating GPS Recenter Button */}
+      <div className="gmaps-floating-controls">
+        <button
+          type="button"
+          className="gmaps-map-fab"
+          onClick={handleRecenterMe}
+          title="Recenter on my location"
+          aria-label="Recenter on my location"
+        >
+          <Crosshair size={18} color="#4285F4" />
+        </button>
+        <button
+          type="button"
+          className="gmaps-map-fab"
+          onClick={handleFitRoute}
+          title="Fit whole route"
+          aria-label="Fit whole route"
+        >
+          <Maximize2 size={16} color="#e8eaed" />
+        </button>
+      </div>
     </div>
   );
 });
