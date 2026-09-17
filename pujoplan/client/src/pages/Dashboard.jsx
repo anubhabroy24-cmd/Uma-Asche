@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../layouts/AppLayout';
 import { getMyGroups, getMySoloPlans } from '../services/api';
-import { Users, MapPin, ChevronRight, Plus, KeyRound, Sparkles } from 'lucide-react';
+import { Users, MapPin, ChevronRight, Plus, KeyRound, Sparkles, Compass } from 'lucide-react';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -101,6 +101,10 @@ export default function Dashboard() {
             <button className="db__quick-btn" onClick={() => navigate('/join-code')}>
               <KeyRound size={16} className="db__quick-btn-icon" />
               <span>Join with Code</span>
+            </button>
+            <button className="db__quick-btn db__quick-btn--bot" onClick={() => navigate('/distance-bot')}>
+              <Compass size={16} className="db__quick-btn-icon" style={{ color: '#ea4335' }} />
+              <span>Distance AI Bot</span>
             </button>
           </div>
         </div>

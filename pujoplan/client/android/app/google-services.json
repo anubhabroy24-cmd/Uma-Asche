@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "889002640427",
+    "project_id": "plucky-dryad-477507-s3",
+    "storage_bucket": "plucky-dryad-477507-s3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889002640427:android:ec4616a52b04c66819166e",
+        "android_client_info": {
+          "package_name": "com.roy.puja"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "889002640427-fhu3ihe7s61h2356sedvvk4is1o2km6n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.roy.puja",
+            "certificate_hash": "d3a9b2264bd3f9ba790ba0c25a0c115aa7048209"
+          }
+        },
+        {
+          "client_id": "889002640427-e7f3pglblnddanrludbgb1u7g8000tsm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC150uGaRExVLzCYhA3W37kFzxsIHdWJ-0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "889002640427-e7f3pglblnddanrludbgb1u7g8000tsm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

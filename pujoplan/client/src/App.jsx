@@ -13,6 +13,7 @@ import SoloPlan       from './pages/SoloPlan';
 import SoloPlanDetail from './pages/SoloPlanDetail';
 import GroupPlans     from './pages/GroupPlans';
 import PandalMapPage  from './pages/PandalMapPage';
+import DistanceBotPage from './pages/DistanceBotPage';
 
 // Full-screen loader shown while Firebase auth state resolves
 function SplashLoader() {
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/solo/:id"         element={<PrivateRoute><SoloPlanDetail /></PrivateRoute>} />
       <Route path="/solo/:id/spots"   element={<PrivateRoute><SpotExplorer mode="solo" /></PrivateRoute>} />
       <Route path="/map"              element={<PrivateRoute><PandalMapPage /></PrivateRoute>} />
+      <Route path="/distance-bot"     element={<PrivateRoute><DistanceBotPage /></PrivateRoute>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
