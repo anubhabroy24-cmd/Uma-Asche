@@ -1,29 +1,31 @@
 /**
  * Google Gemini API Client Service for Durga Puja 2026 Assistant
+ * Automatically connects to backend /api/ai/chat
  */
+import api from './api';
 
 const GEMINI_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro',
+  'gemini-3.6-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
 ];
 
 /**
- * Retrieve the active Gemini API key from localStorage or Vite environment variables
+ * Retrieve active Gemini API key if present in client environment
  */
 export function getGeminiApiKey() {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) {
+    return import.meta.env.VITE_GEMINI_API_KEY.trim();
+  }
   if (typeof window !== 'undefined') {
     const local = localStorage.getItem('pp_gemini_api_key');
     if (local && local.trim()) return local.trim();
-  }
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) {
-    return import.meta.env.VITE_GEMINI_API_KEY.trim();
   }
   return null;
 }
 
 /**
- * Save Gemini API Key into localStorage
+ * Save Gemini API Key into localStorage (optional helper)
  */
 export function setGeminiApiKey(key) {
   if (typeof window !== 'undefined') {
@@ -36,18 +38,20 @@ export function setGeminiApiKey(key) {
 }
 
 /**
- * Build the system instruction for Gemini enforcing the user's domain and constraints
+ * Build fallback system instruction for client-side direct calls if backend is offline
  */
 function buildSystemInstruction(context = {}) {
   const { groupName, startLocation, groupSpots = [], userLocation } = context;
 
-  const spotNames = groupSpots
-    .map((s, i) => `${i + 1}. ${s.name || s.spot?.name || 'Pandal'}${s.area ? ` (${s.area})` : ''}`)
-    .join('\n');
+  const spotNames = Array.isArray(groupSpots)
+    ? groupSpots
+        .map((s, i) => `${i + 1}. ${s.name || s.spot?.name || 'Pandal'}${s.area ? ` (${s.area})` : ''}`)
+        .join('\n')
+    : '';
 
   let locationContext = '';
   if (userLocation && userLocation.latitude && userLocation.longitude) {
-    locationContext = `\nUser's current GPS location: Lat ${userLocation.latitude.toFixed(4)}, Lng ${userLocation.longitude.toFixed(4)} (Kolkata).`;
+    locationContext = `\nUser's current GPS location: Lat ${Number(userLocation.latitude).toFixed(4)}, Lng ${Number(userLocation.longitude).toFixed(4)} (Kolkata).`;
   }
 
   return `You are the intelligent Durga Puja 2026 AI Assistant for the "Uma Asche" Kolkata Durga Puja Hopper & Plan app.
@@ -73,21 +77,39 @@ ${locationContext}`;
 }
 
 /**
- * Call the Gemini REST API
+ * Send query to backend /api/ai/chat with fallback to direct Gemini REST
  */
 export async function sendGeminiMessage(userQuery, conversationHistory = [], context = {}) {
+  // 1. First priority: Connect with backend and pass questions through it
+  try {
+    const res = await api.post('/ai/chat', {
+      message: userQuery,
+      conversationHistory,
+      context,
+    });
+
+    if (res.data && res.data.reply) {
+      return {
+        reply: res.data.reply,
+        gmapsUrl: res.data.gmapsUrl,
+        modelUsed: res.data.modelUsed || 'gemini-3.6-flash',
+        source: 'gemini',
+      };
+    }
+  } catch (backendErr) {
+    console.warn('Backend /api/ai/chat call failed, attempting direct Gemini client fallback:', backendErr);
+  }
+
+  // 2. Direct fallback (for offline preview / netlify static without proxy)
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
     throw new Error('NO_API_KEY');
   }
 
   const systemInstruction = buildSystemInstruction(context);
-
-  // Format previous messages for Gemini contents array
   const contents = [];
 
-  // Add conversation history (last 6 turns for context efficiency)
-  const recentHistory = conversationHistory.slice(-6);
+  const recentHistory = Array.isArray(conversationHistory) ? conversationHistory.slice(-6) : [];
   for (const msg of recentHistory) {
     if (msg.sender === 'user' && msg.text) {
       contents.push({ role: 'user', parts: [{ text: msg.text }] });
@@ -95,8 +117,6 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
       contents.push({ role: 'model', parts: [{ text: msg.reply || msg.text }] });
     }
   }
-
-  // Add current user query
   contents.push({ role: 'user', parts: [{ text: userQuery }] });
 
   const payload = {
@@ -106,14 +126,13 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
     contents,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 800,
+      maxOutputTokens: 1000,
       topP: 0.9,
     },
   };
 
   let lastError = null;
 
-  // Try available models sequentially
   for (const model of GEMINI_MODELS) {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -137,7 +156,6 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
         throw new Error('Empty response received from Gemini API');
       }
 
-      // Check if response contains a Google Maps link for UI buttons
       let extractedGmapsUrl = null;
       const gmapsMatch = textResponse.match(/https:\/\/www\.google\.com\/maps\/[^\s\)\>]+/);
       if (gmapsMatch) {
@@ -152,8 +170,11 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
       };
     } catch (err) {
       lastError = err;
-      // If error is permission denied or key invalid, don't keep trying other models
-      if (err.message.includes('API_KEY_INVALID') || err.message.includes('PERMISSION_DENIED') || err.message.includes('API key not valid')) {
+      if (
+        err.message.includes('API_KEY_INVALID') ||
+        err.message.includes('PERMISSION_DENIED') ||
+        err.message.includes('API key not valid')
+      ) {
         throw err;
       }
     }
