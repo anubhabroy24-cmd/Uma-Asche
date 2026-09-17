@@ -17,8 +17,8 @@ export default function SoloPlan() {
 
   useEffect(() => {
     getMySoloPlans()
-      .then(r => setPlans(r.data))
-      .catch(() => {})
+      .then(r => setPlans(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setPlans([]))
       .finally(() => setLoading(false));
   }, []);
 

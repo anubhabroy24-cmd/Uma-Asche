@@ -39,8 +39,10 @@ export default function SpotExplorer({ mode }) {
       if (crowd !== 'All')    params.crowdLevel = crowd;
 
       const { data } = await getSpots(params);
-      setSpots(pg === 1 ? data.spots : prev => [...prev, ...data.spots]);
-      setTotal(data.total);
+      const spotList = Array.isArray(data) ? data : (Array.isArray(data?.spots) ? data.spots : []);
+      const totalCount = typeof data?.total === 'number' ? data.total : spotList.length;
+      setSpots(pg === 1 ? spotList : prev => [...prev, ...spotList]);
+      setTotal(totalCount);
       setPage(pg);
     } catch (_) {}
     finally { setLoading(false); }

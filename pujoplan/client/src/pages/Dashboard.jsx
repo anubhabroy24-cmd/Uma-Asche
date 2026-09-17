@@ -15,8 +15,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      getMyGroups().then(r => setGroups(r.data)).catch(() => { }),
-      getMySoloPlans().then(r => setSoloPlans(r.data)).catch(() => { }),
+      getMyGroups().then(r => setGroups(Array.isArray(r.data) ? r.data : [])).catch(() => setGroups([])),
+      getMySoloPlans().then(r => setSoloPlans(Array.isArray(r.data) ? r.data : [])).catch(() => setSoloPlans([])),
     ]).finally(() => setLoading(false));
   }, []);
 

@@ -14,9 +14,24 @@ api.interceptors.request.use(config => {
   return config;
 });
 
-// On 401, clear token and reload
+// Intercept responses: catch HTML responses (from SPA 404 rewrites on Vercel/Netlify) and 401s
 api.interceptors.response.use(
-  res => res,
+  res => {
+    // If backend returns HTML (e.g. Vercel SPA rewrite fallback for non-existent /api routes), reject so fallback runs
+    if (
+      typeof res.data === 'string' &&
+      (res.data.includes('<!DOCTYPE html') ||
+       res.data.includes('<!doctype html') ||
+       res.data.includes('<html') ||
+       res.data.includes('<head') ||
+       res.headers['content-type']?.includes('text/html'))
+    ) {
+      const err = new Error('HTML response received from API fallback.');
+      err.response = { status: 404, data: null };
+      return Promise.reject(err);
+    }
+    return res;
+  },
   err => {
     if (err.response?.status === 401 && !err.config?.url?.includes('/auth/session')) {
       localStorage.removeItem('pp_token');
@@ -39,26 +54,32 @@ function getStoredUser() {
 
 function getLocalGroups() {
   try {
-    return JSON.parse(localStorage.getItem('pp_local_groups') || '[]');
+    const data = JSON.parse(localStorage.getItem('pp_local_groups') || '[]');
+    if (!Array.isArray(data)) return [];
+    return data.filter(item => item && typeof item === 'object' && item.id && item.name);
   } catch {
     return [];
   }
 }
 
 function saveLocalGroups(groups) {
-  localStorage.setItem('pp_local_groups', JSON.stringify(groups));
+  const safe = Array.isArray(groups) ? groups : [];
+  localStorage.setItem('pp_local_groups', JSON.stringify(safe));
 }
 
 function getLocalSoloPlans() {
   try {
-    return JSON.parse(localStorage.getItem('pp_local_soloplans') || '[]');
+    const data = JSON.parse(localStorage.getItem('pp_local_soloplans') || '[]');
+    if (!Array.isArray(data)) return [];
+    return data.filter(item => item && typeof item === 'object' && item.id && item.name);
   } catch {
     return [];
   }
 }
 
 function saveLocalSoloPlans(plans) {
-  localStorage.setItem('pp_local_soloplans', JSON.stringify(plans));
+  const safe = Array.isArray(plans) ? plans : [];
+  localStorage.setItem('pp_local_soloplans', JSON.stringify(safe));
 }
 
 function generateRandomToken(len = 8) {
@@ -96,11 +117,17 @@ export const getSpots = async (params = {}) => {
     if (params.region && params.region !== 'All' && params.region !== 'Kolkata') {
       spots = spots.filter(s => s.region.toLowerCase().includes(params.region.toLowerCase()));
     }
+    if (params.category && params.category !== 'All') {
+      spots = spots.filter(s => s.category?.toLowerCase() === params.category.toLowerCase());
+    }
+    if (params.crowdLevel && params.crowdLevel !== 'All') {
+      spots = spots.filter(s => s.crowdLevel?.toLowerCase() === params.crowdLevel.toLowerCase());
+    }
     if (params.search) {
       const q = params.search.toLowerCase();
       spots = spots.filter(s => s.name.toLowerCase().includes(q) || s.area.toLowerCase().includes(q));
     }
-    return { data: spots };
+    return { data: { spots, total: spots.length, page: 1, totalPages: 1 } };
   }
 };
 

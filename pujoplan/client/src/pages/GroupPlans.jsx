@@ -12,8 +12,8 @@ export default function GroupPlans() {
 
   useEffect(() => {
     getMyGroups()
-      .then(r => setGroups(r.data))
-      .catch(() => {})
+      .then(r => setGroups(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setGroups([]))
       .finally(() => setLoading(false));
   }, []);
 
