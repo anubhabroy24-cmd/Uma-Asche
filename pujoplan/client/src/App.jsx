@@ -14,51 +14,57 @@ import SoloPlanDetail from './pages/SoloPlanDetail';
 import GroupPlans     from './pages/GroupPlans';
 import PandalMapPage  from './pages/PandalMapPage';
 
-// Minimal non-flashing loader while auth initializes
+// Full-screen loader shown while Firebase auth state resolves or during minimum 2-second splash delay:
+// Displays the landing/sign-in page without the Google login button.
 function SplashLoader() {
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="spinner" style={{ width: 28, height: 28, borderColor: 'rgba(234,67,53,0.3)', borderTopColor: '#ea4335' }} />
-    </div>
-  );
+  return <Landing showButton={false} />;
 }
 
-// Redirect authenticated users away from landing
-function PublicRoute({ children }) {
+// Redirect authenticated users away from landing after at least 2s splash
+function PublicRoute({ children, splashDone }) {
   const { user, loading } = useAuth();
-  if (loading) return <SplashLoader />;
+  if (loading || !splashDone) return <SplashLoader />;
   if (user)    return <Navigate to="/dashboard" replace />;
   return children;
 }
 
-// Redirect unauthenticated users to landing
-function PrivateRoute({ children }) {
+// Redirect unauthenticated users to landing after at least 2s splash
+function PrivateRoute({ children, splashDone }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  if (loading) return <SplashLoader />;
+  if (loading || !splashDone) return <SplashLoader />;
   if (!user)   return <Navigate to="/" state={{ from: location }} replace />;
   return children;
 }
 
 function AppRoutes() {
+  const [splashDone, setSplashDone] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setSplashDone(true);
+    }, 2000); // exactly 2 seconds of loading splash screen
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <Routes>
       {/* Public */}
-      <Route path="/"    element={<PublicRoute><Landing /></PublicRoute>} />
+      <Route path="/"    element={<PublicRoute splashDone={splashDone}><Landing /></PublicRoute>} />
       {/* Join is semi-public: shows invite info without auth, requires auth to actually join */}
       <Route path="/join/:token" element={<JoinGroup />} />
 
       {/* Protected */}
-      <Route path="/dashboard"        element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-      <Route path="/groups"           element={<PrivateRoute><GroupPlans /></PrivateRoute>} />
-      <Route path="/create-group"     element={<PrivateRoute><CreateGroup /></PrivateRoute>} />
-      <Route path="/join-code"        element={<PrivateRoute><JoinByCode /></PrivateRoute>} />
-      <Route path="/group/:id"        element={<PrivateRoute><GroupDashboard /></PrivateRoute>} />
-      <Route path="/group/:id/spots"  element={<PrivateRoute><SpotExplorer mode="group" /></PrivateRoute>} />
-      <Route path="/solo"             element={<PrivateRoute><SoloPlan /></PrivateRoute>} />
-      <Route path="/solo/:id"         element={<PrivateRoute><SoloPlanDetail /></PrivateRoute>} />
-      <Route path="/solo/:id/spots"   element={<PrivateRoute><SpotExplorer mode="solo" /></PrivateRoute>} />
-      <Route path="/map"              element={<PrivateRoute><PandalMapPage /></PrivateRoute>} />
+      <Route path="/dashboard"        element={<PrivateRoute splashDone={splashDone}><Dashboard /></PrivateRoute>} />
+      <Route path="/groups"           element={<PrivateRoute splashDone={splashDone}><GroupPlans /></PrivateRoute>} />
+      <Route path="/create-group"     element={<PrivateRoute splashDone={splashDone}><CreateGroup /></PrivateRoute>} />
+      <Route path="/join-code"        element={<PrivateRoute splashDone={splashDone}><JoinByCode /></PrivateRoute>} />
+      <Route path="/group/:id"        element={<PrivateRoute splashDone={splashDone}><GroupDashboard /></PrivateRoute>} />
+      <Route path="/group/:id/spots"  element={<PrivateRoute splashDone={splashDone}><SpotExplorer mode="group" /></PrivateRoute>} />
+      <Route path="/solo"             element={<PrivateRoute splashDone={splashDone}><SoloPlan /></PrivateRoute>} />
+      <Route path="/solo/:id"         element={<PrivateRoute splashDone={splashDone}><SoloPlanDetail /></PrivateRoute>} />
+      <Route path="/solo/:id/spots"   element={<PrivateRoute splashDone={splashDone}><SpotExplorer mode="solo" /></PrivateRoute>} />
+      <Route path="/map"              element={<PrivateRoute splashDone={splashDone}><PandalMapPage /></PrivateRoute>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

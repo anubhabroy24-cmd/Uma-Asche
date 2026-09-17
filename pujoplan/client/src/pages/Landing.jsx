@@ -14,7 +14,7 @@ export default function Landing({ showButton = true }) {
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setButtonReady(true);
-    }, 150); // Snappy instant reveal
+    }, 2000); // 2 seconds splash delay
     return () => clearTimeout(timer);
   }, []);
 
