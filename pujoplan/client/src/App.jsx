@@ -20,21 +20,21 @@ function SplashLoader() {
   return <Landing showButton={false} />;
 }
 
-// Redirect authenticated users away from landing after at least 2s splash
+// Redirect authenticated users away from landing
 function PublicRoute({ children, splashDone }) {
   const { user, loading } = useAuth();
+  if (user) return <Navigate to="/dashboard" replace />;
   if (loading || !splashDone) return <SplashLoader />;
-  if (user)    return <Navigate to="/dashboard" replace />;
   return children;
 }
 
-// Redirect unauthenticated users to landing after at least 2s splash
+// Redirect unauthenticated users to landing
 function PrivateRoute({ children, splashDone }) {
   const { user, loading } = useAuth();
   const location = useLocation();
+  if (user) return children;
   if (loading || !splashDone) return <SplashLoader />;
-  if (!user)   return <Navigate to="/" state={{ from: location }} replace />;
-  return children;
+  return <Navigate to="/" state={{ from: location }} replace />;
 }
 
 function AppRoutes() {

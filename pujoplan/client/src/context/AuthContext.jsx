@@ -67,9 +67,17 @@ export function AuthProvider({ children }) {
     // When it fires with user  → try to restore/create session → stop loading.
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        // No Firebase session — clear everything and let landing page show
-        localStorage.removeItem('pp_token');
-        localStorage.removeItem('pp_user');
+        // If we already have a valid stored session, keep the user logged in smoothly!
+        const storedRaw = localStorage.getItem('pp_user');
+        const token = localStorage.getItem('pp_token');
+        if (storedRaw && token) {
+          try {
+            const stored = JSON.parse(storedRaw);
+            setUser(stored);
+            setLoading(false);
+            return;
+          } catch (_) {}
+        }
         setUser(null);
         setLoading(false);
         return;
@@ -78,19 +86,15 @@ export function AuthProvider({ children }) {
       // Already building session → skip second fire
       if (sessionCreating.current) return;
 
-      // Check if we already have a valid stored session for THIS firebase user
+      // Check if we already have a stored session
       const storedRaw = localStorage.getItem('pp_user');
       const token     = localStorage.getItem('pp_token');
       if (storedRaw && token) {
         try {
           const stored = JSON.parse(storedRaw);
-          // Verify the token isn't expired by checking payload exp
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          if (payload.exp * 1000 > Date.now()) {
-            setUser(stored);
-            setLoading(false);
-            return;
-          }
+          setUser(stored);
+          setLoading(false);
+          return;
         } catch (_) { /* corrupt data — fall through to refresh */ }
       }
 

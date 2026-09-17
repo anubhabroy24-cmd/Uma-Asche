@@ -33,11 +33,8 @@ api.interceptors.response.use(
     return res;
   },
   err => {
-    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/session')) {
-      localStorage.removeItem('pp_token');
-      localStorage.removeItem('pp_user');
-      window.location.href = '/';
-    }
+    // If an API request returns 401, reject cleanly so local cache/fallback functions run
+    // without wiping stored data or triggering an infinite loop of redirects to /
     return Promise.reject(err);
   }
 );
