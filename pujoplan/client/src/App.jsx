@@ -14,27 +14,26 @@ import SoloPlanDetail from './pages/SoloPlanDetail';
 import GroupPlans     from './pages/GroupPlans';
 import PandalMapPage  from './pages/PandalMapPage';
 
-// Full-screen loader shown while Firebase auth state resolves or during minimum 2-second splash delay:
-// Displays the landing/sign-in page without the Google login button.
+// Full-screen loader shown during minimum 2-second splash delay on app launch
 function SplashLoader() {
   return <Landing showButton={false} />;
 }
 
-// Redirect authenticated users away from landing
+// Redirect authenticated users away from landing after 2-second splash
 function PublicRoute({ children, splashDone }) {
   const { user, loading } = useAuth();
+  if (!splashDone || loading) return <SplashLoader />;
   if (user) return <Navigate to="/dashboard" replace />;
-  if (loading || !splashDone) return <SplashLoader />;
   return children;
 }
 
-// Redirect unauthenticated users to landing
+// Redirect unauthenticated users to landing after 2-second splash
 function PrivateRoute({ children, splashDone }) {
   const { user, loading } = useAuth();
   const location = useLocation();
-  if (user) return children;
-  if (loading || !splashDone) return <SplashLoader />;
-  return <Navigate to="/" state={{ from: location }} replace />;
+  if (!splashDone || loading) return <SplashLoader />;
+  if (!user) return <Navigate to="/" state={{ from: location }} replace />;
+  return children;
 }
 
 function AppRoutes() {
