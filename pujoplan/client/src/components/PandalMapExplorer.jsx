@@ -38,89 +38,18 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Sample Kolkata Pandal Dataset Fallback
-const DEFAULT_PANDALS = [
-  {
-    id: 'bagbazar-sarbojanin',
-    name: 'Bagbazar Sarbojanin Durgotsav',
-    address: 'Bagbazar, North Kolkata, West Bengal 700003',
-    lat: 22.6025,
-    lng: 88.3688,
-    category: 'Heritage',
-  },
-  {
-    id: 'ahiritola-sarbojanin',
-    name: 'Ahiritola Sarbojanin Durgotsab',
-    address: 'Ahiritola, BK Paul Ave, Kolkata 700005',
-    lat: 22.5938,
-    lng: 88.3582,
-    category: 'Traditional',
-  },
-  {
-    id: 'kumartuli-park',
-    name: 'Kumartuli Park Sarbojanin',
-    address: 'Kumartuli, Hatkhola, Kolkata 700005',
-    lat: 22.5992,
-    lng: 88.3664,
-    category: 'Theme',
-  },
-  {
-    id: 'sovabazar-rajbari',
-    name: 'Sovabazar Rajbari Durga Puja',
-    address: '36 & 33 Raja Nabakrishna Street, Kolkata 700005',
-    lat: 22.5962,
-    lng: 88.3653,
-    category: 'Heritage',
-  },
-  {
-    id: 'sree-bhumi',
-    name: 'Sree Bhumi Sporting Club',
-    address: 'Lake Town, VIP Road, Kolkata 700089',
-    lat: 22.5996,
-    lng: 88.3986,
-    category: 'Grand Theme',
-  },
-  {
-    id: 'ekdalia-evergreen',
-    name: 'Ekdalia Evergreen Club',
-    address: 'Gariahat, South Kolkata, West Bengal 700019',
-    lat: 22.5186,
-    lng: 88.3657,
-    category: 'Traditional',
-  },
-  {
-    id: 'ballygunge-cultural',
-    name: 'Ballygunge Cultural Association',
-    address: 'Ballygunge, Kolkata 700029',
-    lat: 22.5255,
-    lng: 88.3601,
-    category: 'Theme',
-  },
-  {
-    id: 'singhi-park',
-    name: 'Singhi Park Sarbojanin',
-    address: 'Dover Lane, Ballygunge, Kolkata 700029',
-    lat: 22.5209,
-    lng: 88.3642,
-    category: 'Traditional',
-  },
-  {
-    id: 'suruchi-sangha',
-    name: 'Suruchi Sangha',
-    address: 'New Alipore, Kolkata 700053',
-    lat: 22.5085,
-    lng: 88.3341,
-    category: 'Theme',
-  },
-  {
-    id: 'chetla-agrani',
-    name: 'Chetla Agrani Club',
-    address: 'Peary Mohan Roy Road, Chetla, Kolkata 700027',
-    lat: 22.5201,
-    lng: 88.3418,
-    category: 'Theme',
-  },
-];
+import { DEFAULT_PANDALS as CORE_PANDALS } from '../data/defaultPandals';
+
+// All 75+ Major Kolkata Pandals Fallback Dataset
+const DEFAULT_PANDALS = CORE_PANDALS.map(p => ({
+  id: p.id,
+  name: p.name,
+  address: p.address,
+  lat: p.latitude,
+  lng: p.longitude,
+  category: p.category,
+}));
+
 
 /**
  * Creates custom festive SVG teardrop pin for Pandals
