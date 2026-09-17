@@ -14,7 +14,7 @@ export default function Landing({ showButton = true }) {
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setButtonReady(true);
-    }, 2000); // delay landing page button for min 2 sec
+    }, 150); // Snappy instant reveal
     return () => clearTimeout(timer);
   }, []);
 
@@ -40,6 +40,7 @@ export default function Landing({ showButton = true }) {
       <div className="landing__bg">
         <video
           src="/x.mp4"
+          poster="/x_poster.jpg"
           autoPlay
           loop
           muted

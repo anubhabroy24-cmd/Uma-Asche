@@ -109,6 +109,7 @@ export default function Dashboard() {
         <div className="db__dhak-wrap">
           <video
             src="/dhak.mp4"
+            poster="/dhak_poster.jpg"
             autoPlay
             loop
             muted
