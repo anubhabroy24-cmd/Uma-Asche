@@ -13,11 +13,14 @@ import SoloPlan       from './pages/SoloPlan';
 import SoloPlanDetail from './pages/SoloPlanDetail';
 import GroupPlans     from './pages/GroupPlans';
 import PandalMapPage  from './pages/PandalMapPage';
-import DistanceBotPage from './pages/DistanceBotPage';
 
-// Full-screen loader shown while Firebase auth state resolves
+// Minimal non-flashing loader while auth initializes
 function SplashLoader() {
-  return <Landing showButton={false} />;
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="spinner" style={{ width: 28, height: 28, borderColor: 'rgba(234,67,53,0.3)', borderTopColor: '#ea4335' }} />
+    </div>
+  );
 }
 
 // Redirect authenticated users away from landing
@@ -56,7 +59,6 @@ function AppRoutes() {
       <Route path="/solo/:id"         element={<PrivateRoute><SoloPlanDetail /></PrivateRoute>} />
       <Route path="/solo/:id/spots"   element={<PrivateRoute><SpotExplorer mode="solo" /></PrivateRoute>} />
       <Route path="/map"              element={<PrivateRoute><PandalMapPage /></PrivateRoute>} />
-      <Route path="/distance-bot"     element={<PrivateRoute><DistanceBotPage /></PrivateRoute>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

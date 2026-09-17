@@ -44,10 +44,22 @@ async function createAppSession(firebaseUser) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser]     = useState(null);
-  const [loading, setLoading] = useState(true); // true until we know auth state
-  const [error, setError]   = useState(null);
-  const sessionCreating     = useRef(false);    // prevent double-fire
+  const [user, setUser] = useState(() => {
+    try {
+      const storedRaw = localStorage.getItem('pp_user');
+      const token = localStorage.getItem('pp_token');
+      if (storedRaw && token) {
+        return JSON.parse(storedRaw);
+      }
+    } catch (_) {}
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    const token = localStorage.getItem('pp_token');
+    return !token; // If token exists, don't flash loading screen
+  });
+  const [error, setError] = useState(null);
+  const sessionCreating = useRef(false); // prevent double-fire
 
   useEffect(() => {
     // onAuthStateChanged is THE single source of truth.

@@ -5,6 +5,7 @@ import AppLayout from '../layouts/AppLayout';
 import PujaMap from '../components/PujaMap';
 import GroupChat from '../components/GroupChat';
 import GmapsBottomSheet from '../components/GmapsBottomSheet';
+import DistanceChatbot from '../components/DistanceChatbot';
 import { solveNearestNeighbor, calculateLegDistances } from '../utils/routeOptimizer';
 import {
   getGroupById, voteGroupSpot, removeGroupSpot,
@@ -842,6 +843,16 @@ export default function GroupDashboard() {
               </>
             )}
           </div>
+        )}
+
+        {/* Distance Chatbot: strictly inside 9:16 frame, only when group is created & plan is done */}
+        {group && group.spots && group.spots.length > 0 && (
+          <DistanceChatbot
+            groupSpots={group.spots.map(s => s.spot || s)}
+            groupName={group.name}
+            startLocation={group.startLocation}
+            waypoints={waypoints}
+          />
         )}
       </div>
     </AppLayout>

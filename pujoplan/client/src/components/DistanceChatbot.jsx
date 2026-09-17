@@ -30,9 +30,48 @@ const INITIAL_MESSAGES = [
   },
 ];
 
-export default function DistanceChatbot({ defaultOpen = false }) {
+export default function DistanceChatbot({
+  defaultOpen = false,
+  groupSpots = [],
+  groupName = '',
+  startLocation = '',
+  waypoints = []
+}) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+
+  const getInitialMessages = () => {
+    if (groupSpots && groupSpots.length > 0) {
+      const spotNames = groupSpots.map(s => s.name || s.spot?.name).filter(Boolean);
+      const suggestions = [];
+      if (spotNames.length >= 2) {
+        suggestions.push(`Distance: ${spotNames[0]} to ${spotNames[1]}`);
+      }
+      suggestions.push('Shortest route for our group plan');
+      if (startLocation) {
+        suggestions.push(`Distance from ${startLocation} to ${spotNames[0] || 'first stop'}`);
+      }
+      suggestions.push('Pandals near my GPS location');
+
+      return [
+        {
+          id: 'msg-init',
+          sender: 'bot',
+          type: 'greeting',
+          reply: `শুভ শারদীয়া! 🙏 I am ready to assist with **${groupName || 'your group plan'}** (${spotNames.length} spots planned).`,
+          details: [
+            `• Start Point: ${startLocation || 'Kolkata Central'}`,
+            `• Planned Stops: ${spotNames.slice(0, 4).join(', ')}${spotNames.length > 4 ? '…' : ''}`,
+            'Ask me distances between your planned spots, walking times, or directions!',
+          ],
+          suggestions,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }
+      ];
+    }
+    return INITIAL_MESSAGES;
+  };
+
+  const [messages, setMessages] = useState(getInitialMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
@@ -155,7 +194,7 @@ export default function DistanceChatbot({ defaultOpen = false }) {
   };
 
   const handleClearChat = () => {
-    setMessages(INITIAL_MESSAGES);
+    setMessages(getInitialMessages());
   };
 
   return (

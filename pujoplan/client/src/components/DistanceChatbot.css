@@ -4,24 +4,34 @@
 
 .distbot-root {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 9999;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px; /* Strictly locked inside the 9:16 mobile phone frame */
+  padding: 0 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 1200;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* ── Floating Launcher Trigger Button ──────────────────────────── */
 .distbot-trigger {
+  pointer-events: auto;
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px 10px 14px;
+  gap: 10px;
+  padding: 8px 14px;
   background: linear-gradient(135deg, #18181b 0%, #09090b 100%);
-  border: 1.5px solid rgba(234, 67, 53, 0.4);
+  border: 1.5px solid rgba(234, 67, 53, 0.5);
   border-radius: 9999px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7),
-              0 0 20px rgba(234, 67, 53, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8),
+              0 0 18px rgba(234, 67, 53, 0.35);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   color: #fff;
@@ -99,11 +109,12 @@
 
 /* ── Chat Window Modal ─────────────────────────────────────────── */
 .distbot-window {
-  width: 380px;
-  height: 580px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 100px);
-  background: rgba(15, 15, 18, 0.95);
+  pointer-events: auto;
+  width: 100%;
+  max-width: 448px;
+  height: 72vh;
+  max-height: 520px;
+  background: rgba(15, 15, 18, 0.96);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1.5px solid rgba(255, 255, 255, 0.12);

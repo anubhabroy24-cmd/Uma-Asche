@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
-import DistanceChatbot from '../components/DistanceChatbot';
 import './AppLayout.css';
 
 export default function AppLayout({ children, title, back, onBack, theme = '' }) {
@@ -70,9 +69,6 @@ export default function AppLayout({ children, title, back, onBack, theme = '' })
           </div>
         </div>
       )}
-
-      {/* Floating Distance & Route AI Chatbot */}
-      <DistanceChatbot />
     </div>
   );
 }

@@ -102,10 +102,6 @@ export default function Dashboard() {
               <KeyRound size={16} className="db__quick-btn-icon" />
               <span>Join with Code</span>
             </button>
-            <button className="db__quick-btn db__quick-btn--bot" onClick={() => navigate('/distance-bot')}>
-              <Compass size={16} className="db__quick-btn-icon" style={{ color: '#ea4335' }} />
-              <span>Distance AI Bot</span>
-            </button>
           </div>
         </div>
 
