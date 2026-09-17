@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Compass, X, Send, MapPin, Navigation, ArrowRight,
   ExternalLink, RotateCcw, Footprints, Car,
-  ChevronDown, Flame
+  ChevronDown, Flame, Sparkles, Key, Check
 } from 'lucide-react';
 import { processDistanceQuery } from '../utils/distanceBotEngine';
 import { getReliableCurrentLocation } from '../services/routingService';
+import { getGeminiApiKey, setGeminiApiKey, sendGeminiMessage } from '../services/geminiService';
 import './DistanceChatbot.css';
 
 const INITIAL_MESSAGES = [
@@ -46,6 +47,9 @@ export default function DistanceChatbot({
   const [userLocation, setUserLocation] = useState(null);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState('');
+  const [geminiKey, setGeminiKey] = useState(getGeminiApiKey);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
   const messagesEndRef = useRef(null);
 
   // Auto scroll to bottom
@@ -121,33 +125,71 @@ export default function DistanceChatbot({
     setIsTyping(true);
 
     const activeLoc = overrideLoc || userLocation;
+    const currentKey = getGeminiApiKey();
 
-    // Simulate smart cognitive processing
-    setTimeout(async () => {
+    if (currentKey) {
       try {
+        const geminiRes = await sendGeminiMessage(text, messages, {
+          groupName,
+          startLocation,
+          groupSpots,
+          userLocation: activeLoc,
+        });
+
+        const botMsg = {
+          id: 'bot-' + Date.now(),
+          sender: 'bot',
+          type: 'gemini_response',
+          reply: geminiRes.reply,
+          gmapsUrl: geminiRes.gmapsUrl,
+          modelUsed: geminiRes.modelUsed,
+          source: 'gemini',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setMessages((prev) => [...prev, botMsg]);
+      } catch (err) {
+        console.warn('Gemini API call error, falling back to local engine:', err);
         const responseData = await processDistanceQuery(text, activeLoc);
         const botMsg = {
           id: 'bot-' + Date.now(),
           sender: 'bot',
           ...responseData,
+          warning: err.message.includes('API_KEY') || err.message.includes('PERMISSION_DENIED')
+            ? '⚠️ Gemini API key rejected. Click "Set Gemini Key" to update it.'
+            : undefined,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         setMessages((prev) => [...prev, botMsg]);
-      } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: 'bot-' + Date.now(),
-            sender: 'bot',
-            type: 'text',
-            reply: 'Sorry, I ran into an error computing distances. Please try another pandal name!',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ]);
       } finally {
         setIsTyping(false);
       }
-    }, 450);
+    } else {
+      setTimeout(async () => {
+        try {
+          const responseData = await processDistanceQuery(text, activeLoc);
+          const botMsg = {
+            id: 'bot-' + Date.now(),
+            sender: 'bot',
+            ...responseData,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages((prev) => [...prev, botMsg]);
+        } catch (err) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: 'bot-' + Date.now(),
+              sender: 'bot',
+              type: 'text',
+              reply: 'Sorry, I ran into an error. Please ask about Kolkata Puja pandals or routes!',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+        } finally {
+          setIsTyping(false);
+        }
+      }, 350);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -210,6 +252,19 @@ export default function DistanceChatbot({
 
             <div className="distbot-header__actions">
               <button
+                type="button"
+                className={`distbot-key-badge-btn ${geminiKey ? 'distbot-key-badge-btn--active' : ''}`}
+                onClick={() => {
+                  setKeyInput(geminiKey || '');
+                  setShowKeyModal(true);
+                }}
+                title="Configure Google Gemini API Key"
+              >
+                <Sparkles size={12} color={geminiKey ? '#4285f4' : '#f5c518'} />
+                <span>{geminiKey ? 'Gemini Active' : 'Set Gemini Key'}</span>
+              </button>
+
+              <button
                 className="distbot-header__btn"
                 onClick={handleClearChat}
                 title="Reset conversation"
@@ -256,10 +311,41 @@ export default function DistanceChatbot({
                   </div>
                 ) : (
                   <div className="distbot-msg__card">
+                    {/* Gemini Badge */}
+                    {m.source === 'gemini' && (
+                      <div className="distbot-gemini-badge">
+                        <Sparkles size={11} color="#4285f4" />
+                        <span>Gemini AI</span>
+                      </div>
+                    )}
+
+                    {/* Warning if key issues */}
+                    {m.warning && (
+                      <div className="distbot-msg__warning" style={{ color: '#ffb300', fontSize: '0.74rem', marginBottom: 6 }}>
+                        {m.warning}
+                      </div>
+                    )}
+
                     {/* Bot Title / Reply */}
-                    <div className="distbot-msg__text">
+                    <div className="distbot-msg__text" style={{ whiteSpace: 'pre-wrap' }}>
                       <p>{m.reply}</p>
                     </div>
+
+                    {/* Direct Google Maps Link Button */}
+                    {m.gmapsUrl && m.type !== 'bathroom_card' && m.type !== 'distance_card' && (
+                      <div style={{ marginTop: 8 }}>
+                        <a
+                          href={m.gmapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="distbot-action-btn distbot-action-btn--gmaps"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+                        >
+                          <ExternalLink size={14} />
+                          <span>Open in Google Maps</span>
+                        </a>
+                      </div>
+                    )}
 
                     {/* Details Bullet List */}
                     {m.details && (
@@ -480,6 +566,93 @@ export default function DistanceChatbot({
               <Send size={16} />
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Gemini API Key Configuration Modal */}
+      {showKeyModal && (
+        <div className="distbot-modal-backdrop" onClick={() => setShowKeyModal(false)}>
+          <div className="distbot-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="distbot-modal-header">
+              <div className="distbot-modal-title">
+                <Sparkles size={16} color="#f5c518" />
+                <span>Google Gemini API Configuration</span>
+              </div>
+              <button
+                type="button"
+                className="distbot-modal-close"
+                onClick={() => setShowKeyModal(false)}
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="distbot-modal-desc">
+              Enter your Google Gemini API key to power intelligent conversational responses, route advice, and pandal guidance.
+              Your key is saved locally in your browser.
+            </p>
+
+            <div className="distbot-modal-input-wrap">
+              <input
+                type="password"
+                className="distbot-modal-input"
+                placeholder="AIzaSy..."
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="distbot-modal-help">
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="distbot-modal-link"
+              >
+                <ExternalLink size={12} />
+                <span>Get a free Gemini API key from Google AI Studio</span>
+              </a>
+            </div>
+
+            <div className="distbot-modal-actions">
+              {geminiKey && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
+                  onClick={() => {
+                    setGeminiApiKey('');
+                    setGeminiKey(null);
+                    setKeyInput('');
+                    setShowKeyModal(false);
+                  }}
+                >
+                  Remove Key
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowKeyModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-yellow btn-sm"
+                onClick={() => {
+                  setGeminiApiKey(keyInput);
+                  setGeminiKey(getGeminiApiKey());
+                  setShowKeyModal(false);
+                }}
+              >
+                <Check size={14} />
+                Save Key
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

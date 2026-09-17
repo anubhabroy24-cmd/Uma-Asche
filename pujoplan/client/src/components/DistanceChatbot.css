@@ -841,3 +841,156 @@
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ── Gemini Key Button in Chatbot Header ───────────────────────── */
+.distbot-key-badge-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 4px 10px;
+  color: var(--gray-light);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.distbot-key-badge-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white);
+  border-color: rgba(245, 197, 24, 0.4);
+}
+
+.distbot-key-badge-btn--active {
+  background: rgba(66, 133, 244, 0.15);
+  border-color: rgba(66, 133, 244, 0.4);
+  color: #8ab4f8;
+}
+
+/* ── Modal Backdrop & Box ──────────────────────────────────────── */
+.distbot-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: gdFadeIn 0.2s ease-out;
+}
+
+.distbot-modal-box {
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.distbot-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.distbot-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #f5c518;
+}
+
+.distbot-modal-close {
+  background: none;
+  border: none;
+  color: var(--gray-mid);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.distbot-modal-close:hover {
+  color: #fff;
+}
+
+.distbot-modal-desc {
+  font-size: 0.78rem;
+  color: #aaa;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.distbot-modal-input-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.distbot-modal-input {
+  width: 100%;
+  background: #09090b;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 0.82rem;
+  font-family: monospace;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.distbot-modal-input:focus {
+  border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.distbot-modal-help {
+  display: flex;
+  align-items: center;
+}
+
+.distbot-modal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8ab4f8;
+  font-size: 0.72rem;
+  text-decoration: none;
+}
+
+.distbot-modal-link:hover {
+  text-decoration: underline;
+}
+
+.distbot-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.distbot-gemini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: #8ab4f8;
+  background: rgba(66, 133, 244, 0.1);
+  border: 1px solid rgba(66, 133, 244, 0.25);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}

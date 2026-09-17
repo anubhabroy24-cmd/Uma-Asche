@@ -13,6 +13,7 @@ const userRoutes     = require('./routes/users');
 const spotRoutes     = require('./routes/spots');
 const groupRoutes    = require('./routes/groups');
 const soloPlanRoutes = require('./routes/soloPlans');
+const aiRoutes       = require('./routes/ai');
 
 initFirebase();
 
@@ -59,6 +60,7 @@ app.use('/api/users',      userRoutes);
 app.use('/api/spots',      spotRoutes);
 app.use('/api/groups',     groupRoutes);
 app.use('/api/solo-plans', soloPlanRoutes);
+app.use('/api/ai',         aiRoutes);
 
 // ─── Any /api/* that didn't match → 404 JSON ─────────────────
 app.use('/api', (req, res) => {
