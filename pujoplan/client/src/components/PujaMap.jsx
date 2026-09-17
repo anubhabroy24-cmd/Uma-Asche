@@ -178,7 +178,7 @@ const PujaMap = forwardRef(function PujaMap({
     }).addTo(userToStartRouteLayerRef.current);
   }, []);
 
-  // Helper to draw custom SVG teardrop stop markers
+  // Helper to draw custom SVG teardrop stop markers (Static & Fixed)
   const drawStopMarkers = useCallback((points) => {
     if (!stopMarkersLayerRef.current) return;
     stopMarkersLayerRef.current.clearLayers();
@@ -188,34 +188,20 @@ const PujaMap = forwardRef(function PujaMap({
       const isStart = i === 0;
       const marker = L.marker([Number(wp.lat), Number(wp.lng)], {
         icon: createSvgTeardropPin(isStart ? 'S' : i, isStart),
-        draggable: true,
+        draggable: false, // Map pins are static to prevent accidental relocation on touch
         zIndexOffset: isStart ? 1100 : 1000 - i,
       });
 
-      marker.on('dragend', (ev) => {
-        const pos = ev.target.getLatLng();
-        const updated = [...points];
-        if (updated[i]) {
-          updated[i] = {
-            ...updated[i],
-            lat: pos.lat,
-            lng: pos.lng,
-          };
-          if (onWaypointsChange) onWaypointsChange(updated);
-        }
-      });
-
       marker.bindPopup(
-        `<div style="font-family:Roboto,sans-serif;">
-          <strong style="color:#ea4335;">${isStart ? 'START POINT' : `STOP #${i}`}</strong><br/>
-          <span>${wp.name || 'Pandal Stop'}</span><br/>
-          <small style="color:#888;">Drag pin to update route</small>
+        `<div style="font-family:Roboto,sans-serif; padding: 2px;">
+          <strong style="color:#ea4335; font-size: 13px;">${isStart ? '🚩 START LOCATION' : `📍 STOP #${i}`}</strong><br/>
+          <span style="font-weight: 600; color: #fff; font-size: 13px;">${wp.name || 'Pandal Stop'}</span>
         </div>`
       );
 
       stopMarkersLayerRef.current.addLayer(marker);
     });
-  }, [onWaypointsChange]);
+  }, []);
 
   // ── 1. Initialize Leaflet Map with CartoDB Dark Tiles ──
   useEffect(() => {
@@ -251,19 +237,6 @@ const PujaMap = forwardRef(function PujaMap({
         mapInstanceRef.current.invalidateSize();
       }
     }, 250);
-
-    // Click to drop draggable waypoint
-    map.on('click', (e) => {
-      const { lat, lng } = e.latlng;
-      if (onWaypointsChange) {
-        const newWp = {
-          name: `Dropped Pin (${lat.toFixed(3)}, ${lng.toFixed(3)})`,
-          lat,
-          lng,
-        };
-        onWaypointsChange([...effectiveWaypoints, newWp]);
-      }
-    });
 
     mapInstanceRef.current = map;
 
