@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Compass, X, Send, MapPin, Navigation, ArrowRight,
-  ExternalLink, RotateCcw, Sparkles, Footprints, Car,
+  ExternalLink, RotateCcw, Footprints, Car,
   ChevronDown, Flame
 } from 'lucide-react';
 import { processDistanceQuery } from '../utils/distanceBotEngine';
@@ -13,11 +13,6 @@ const INITIAL_MESSAGES = [
     sender: 'bot',
     type: 'greeting',
     reply: 'শুভ শারদীয়া! 🙏',
-    suggestions: [
-      'Howrah to Maidan distance',
-      'Find bathrooms near me',
-      'Shortest route for our group plan',
-    ],
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   },
 ];
@@ -32,22 +27,12 @@ export default function DistanceChatbot({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const getInitialMessages = () => {
-    const spotNames = (groupSpots || []).map(s => s.name || s.spot?.name).filter(Boolean);
-    const suggestions = [];
-    if (spotNames.length >= 2) {
-      suggestions.push(`Distance: ${spotNames[0]} to ${spotNames[1]}`);
-    }
-    suggestions.push('Howrah to Maidan distance');
-    suggestions.push('Find bathrooms near me');
-    suggestions.push('Shortest route for our group plan');
-
     return [
       {
         id: 'msg-init',
         sender: 'bot',
         type: 'greeting',
         reply: 'শুভ শারদীয়া! 🙏',
-        suggestions,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }
     ];
@@ -453,32 +438,6 @@ export default function DistanceChatbot({
                                 )}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Suggestions Chips */}
-                    {m.suggestions && m.suggestions.length > 0 && (
-                      <div className="distbot-suggestions">
-                        <span className="distbot-sugg-title">
-                          <Sparkles size={12} /> Suggested queries:
-                        </span>
-                        <div className="distbot-chips">
-                          {m.suggestions.map((sugg, i) => (
-                            <button
-                              key={i}
-                              className="distbot-chip"
-                              onClick={() => {
-                                if (sugg === '📍 Use My Location') {
-                                  handleGetLocation();
-                                } else {
-                                  sendMessage(sugg);
-                                }
-                              }}
-                            >
-                              {sugg}
-                            </button>
                           ))}
                         </div>
                       </div>
