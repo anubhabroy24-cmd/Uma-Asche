@@ -5,6 +5,7 @@ import {
   ChevronDown, Flame
 } from 'lucide-react';
 import { processDistanceQuery } from '../utils/distanceBotEngine';
+import { getReliableCurrentLocation } from '../services/routingService';
 import './DistanceChatbot.css';
 
 const INITIAL_MESSAGES = [
@@ -82,31 +83,24 @@ export default function DistanceChatbot({
   };
 
   // Fetch device GPS coordinates
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      setLocError('Geolocation not supported on your browser.');
-      return;
-    }
+  const handleGetLocation = async () => {
     setLocLoading(true);
     setLocError('');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        };
-        setUserLocation(coords);
-        setLocLoading(false);
-        // Automatically ask for nearby pandals once GPS is acquired
-        sendMessage('Pandals near my current GPS location', coords);
-      },
-      (err) => {
-        setLocLoading(false);
-        setLocError('Could not get GPS. Please allow location permissions.');
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
+    try {
+      const loc = await getReliableCurrentLocation();
+      const coords = {
+        latitude: loc.lat,
+        longitude: loc.lng,
+        accuracy: loc.accuracy,
+      };
+      setUserLocation(coords);
+      setLocLoading(false);
+      // Automatically ask for nearby pandals once GPS is acquired
+      sendMessage('Pandals near my current GPS location', coords);
+    } catch (err) {
+      setLocLoading(false);
+      setLocError('Could not get GPS. Please allow location permissions.');
+    }
   };
 
   // Send message

@@ -34,33 +34,112 @@ export function formatDuration(seconds) {
 }
 
 /**
- * Get current browser geolocation
+ * Get current browser geolocation with automatic fallback
  * @returns {Promise<{lat: number, lng: number, accuracy: number}>}
  */
-export function getCurrentLocation(options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }) {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by your browser'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        resolve({
+export function getCurrentLocation(options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }) {
+  return getReliableCurrentLocation();
+}
+
+/**
+ * Robust multi-tier location retriever:
+ * 1. High accuracy GPS (short timeout 3.5s)
+ * 2. Low accuracy WiFi/Cell network (short timeout 3.5s)
+ * 3. IP-based location fallback (ipinfo.io / ipapi.co)
+ * 4. Safe default Kolkata coordinates
+ */
+export async function getReliableCurrentLocation(defaultCoords = { lat: 22.5726, lng: 88.3639 }) {
+  // Tier 1: Try browser geolocation with high accuracy
+  if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 3500,
+          maximumAge: 10000,
+        });
+      });
+      if (pos?.coords?.latitude && pos?.coords?.longitude) {
+        return {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          accuracy: pos.coords.accuracy || 20,
+          source: 'gps',
+        };
+      }
+    } catch (_) {
+      // Tier 2: Try low accuracy network geolocation (often works when GPS times out)
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false,
+            timeout: 3500,
+            maximumAge: 60000,
+          });
         });
-      },
-      err => {
-        let message = 'Unable to retrieve location';
-        if (err.code === 1) message = 'Location permission was denied.';
-        else if (err.code === 2) message = 'Position unavailable.';
-        else if (err.code === 3) message = 'Location request timed out.';
-        reject(new Error(message));
-      },
-      options
-    );
-  });
+        if (pos?.coords?.latitude && pos?.coords?.longitude) {
+          return {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy || 100,
+            source: 'network',
+          };
+        }
+      } catch (_) {}
+    }
+  }
+
+  // Tier 3: IP-based geolocation (reliable for desktops / laptops / emulators)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch('https://ipinfo.io/json', { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.loc) {
+        const [latStr, lngStr] = data.loc.split(',');
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return {
+            lat,
+            lng,
+            accuracy: 1500,
+            city: data.city,
+            source: 'ip',
+          };
+        }
+      }
+    }
+  } catch (_) {}
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        return {
+          lat: parseFloat(data.latitude),
+          lng: parseFloat(data.longitude),
+          accuracy: 2000,
+          city: data.city,
+          source: 'ip',
+        };
+      }
+    }
+  } catch (_) {}
+
+  // Tier 4: Fallback coordinates (Kolkata)
+  return {
+    lat: defaultCoords.lat || 22.5726,
+    lng: defaultCoords.lng || 88.3639,
+    accuracy: 3000,
+    source: 'fallback',
+  };
 }
 
 /**

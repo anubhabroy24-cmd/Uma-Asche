@@ -13,6 +13,7 @@ import {
   removeMember, regenerateInvite, deleteGroup,
   getGroupLocations, updateGroupLocation,
 } from '../services/api';
+import { getReliableCurrentLocation } from '../services/routingService';
 import {
   MapPin, Plus, ThumbsUp, Trash2, Copy, Share2,
   Check, Star, Route, Users, ChevronDown, ChevronUp, AlertTriangle,
@@ -312,43 +313,67 @@ export default function GroupDashboard() {
     return () => clearInterval(interval);
   }, [fetchLocations]);
 
-  // watchPosition with debounced write every 5 seconds
+  // Continuous GPS watch & sync when sharing
   const lastWriteTimeRef = useRef(0);
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!isSharing) return;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const loc = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy || 25,
-        };
-        setMyLocation(loc);
+    let watchId = null;
+    let syncInterval = null;
 
-        // Debounce server writes every 5 seconds if location sharing is on
-        if (isSharing) {
-          const now = Date.now();
-          if (now - lastWriteTimeRef.current > 5000) {
-            lastWriteTimeRef.current = now;
-            updateGroupLocation(id, {
-              latitude: loc.latitude,
-              longitude: loc.longitude,
-              isSharingLocation: true,
-            }).catch(() => {});
-          }
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const loc = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy || 25,
+            };
+            setMyLocation(loc);
+
+            const now = Date.now();
+            if (now - lastWriteTimeRef.current > 5000) {
+              lastWriteTimeRef.current = now;
+              updateGroupLocation(id, {
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                isSharingLocation: true,
+              }).catch(() => {});
+            }
+          },
+          (err) => {
+            console.warn('Geolocation watchPosition note:', err?.message);
+          },
+          { enableHighAccuracy: false, maximumAge: 10000, timeout: 8000 }
+        );
+      } catch (_) {}
+    }
+
+    // Periodic heartbeat sync every 10s to keep sharing alive on server
+    syncInterval = setInterval(() => {
+      if (myLocation?.latitude && myLocation?.longitude) {
+        const now = Date.now();
+        if (now - lastWriteTimeRef.current > 9000) {
+          lastWriteTimeRef.current = now;
+          updateGroupLocation(id, {
+            latitude: myLocation.latitude,
+            longitude: myLocation.longitude,
+            isSharingLocation: true,
+          }).catch(() => {});
         }
-      },
-      (err) => {
-        console.warn('Geolocation error:', err);
-      },
-      { enableHighAccuracy: true, maximumAge: 4000, timeout: 10000 }
-    );
+      }
+    }, 10000);
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (watchId !== null && navigator?.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (syncInterval) {
+        clearInterval(syncInterval);
+      }
     };
-  }, [id, isSharing]);
+  }, [id, isSharing, myLocation?.latitude, myLocation?.longitude]);
 
   // Toggle Location Sharing
   async function handleToggleSharing() {
@@ -357,6 +382,7 @@ export default function GroupDashboard() {
       try {
         await updateGroupLocation(id, { isSharingLocation: false });
         setIsSharing(false);
+        setToastMessage('Stopped sharing location.');
         fetchLocations();
       } catch (e) {
         setToastMessage('Failed to stop sharing location.');
@@ -364,38 +390,31 @@ export default function GroupDashboard() {
         setSharingLoading(false);
       }
     } else {
-      if (!navigator.geolocation) {
-        setToastMessage('Geolocation is not supported by your browser.');
+      try {
+        const defaultLat = waypoints?.[0]?.lat || 22.5726;
+        const defaultLng = waypoints?.[0]?.lng || 88.3639;
+        const loc = await getReliableCurrentLocation({ lat: defaultLat, lng: defaultLng });
+
+        const locData = {
+          latitude: loc.lat,
+          longitude: loc.lng,
+          isSharingLocation: true,
+        };
+
+        await updateGroupLocation(id, locData);
+        setIsSharing(true);
+        setMyLocation({
+          latitude: loc.lat,
+          longitude: loc.lng,
+          accuracy: loc.accuracy || 25,
+        });
+        setToastMessage('📍 Sharing live location with group!');
+        fetchLocations();
+      } catch (err) {
+        setToastMessage('Could not retrieve location. Please check browser permissions.');
+      } finally {
         setSharingLoading(false);
-        return;
       }
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          try {
-            await updateGroupLocation(id, {
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              isSharingLocation: true,
-            });
-            setIsSharing(true);
-            setMyLocation({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              accuracy: pos.coords.accuracy || 25,
-            });
-            fetchLocations();
-          } catch (e) {
-            setToastMessage('Could not update live location.');
-          } finally {
-            setSharingLoading(false);
-          }
-        },
-        (err) => {
-          setToastMessage(err.message || 'Location permission denied.');
-          setSharingLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-      );
     }
   }
 
