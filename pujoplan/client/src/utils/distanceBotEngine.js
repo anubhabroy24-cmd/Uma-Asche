@@ -3,11 +3,14 @@ import { haversineDistanceKm, solveNearestNeighbor } from './routeOptimizer';
 
 // Major Kolkata Transit Hubs and Landmarks
 export const POPULAR_LANDMARKS = [
-  { name: 'Howrah Railway Station', aliases: ['howrah', 'howrah station', 'hwh'], lat: 22.5839, lng: 88.3424, type: 'Station' },
-  { name: 'Sealdah Railway Station', aliases: ['sealdah', 'sealdah station', 'sda'], lat: 22.5701, lng: 88.3698, type: 'Station' },
+  { name: 'Howrah Station', aliases: ['howrah', 'howrah station', 'howrah rly station', 'howrah railway station', 'hwh', 'howrah bridge'], lat: 22.5839, lng: 88.3424, type: 'Station' },
+  { name: 'Sealdah Station', aliases: ['sealdah', 'sealdah station', 'sda'], lat: 22.5701, lng: 88.3698, type: 'Station' },
+  { name: 'Maidan', aliases: ['maidan', 'maidan metro', 'maidan ground', 'brigade ground', 'brigade'], lat: 22.5520, lng: 88.3490, type: 'Metro & Park' },
+  { name: 'Victoria Memorial', aliases: ['victoria', 'victoria memorial'], lat: 22.5448, lng: 88.3426, type: 'Monument' },
   { name: 'Kolkata Airport (CCU)', aliases: ['airport', 'dum dum airport', 'nscbi airport'], lat: 22.6547, lng: 88.4467, type: 'Airport' },
   { name: 'Esplanade / Dharmatala', aliases: ['esplanade', 'dharmatala', 'curzon park'], lat: 22.5645, lng: 88.3533, type: 'Central Hub' },
   { name: 'Park Street', aliases: ['park street', 'park st'], lat: 22.5518, lng: 88.3524, type: 'Landmark' },
+  { name: 'Rabindra Sadan', aliases: ['rabindra sadan', 'exide', 'exide crossing'], lat: 22.5415, lng: 88.3485, type: 'Metro & Cultural' },
   { name: 'Shyambazar Five-Point', aliases: ['shyambazar', 'shyambazar 5 point'], lat: 22.6022, lng: 88.3712, type: 'Transit Point' },
   { name: 'Gariahat Crossing', aliases: ['gariahat', 'gariahat more'], lat: 22.5186, lng: 88.3650, type: 'Shopping Hub' },
   { name: 'Jadavpur 8B', aliases: ['jadavpur', 'jadavpur 8b', 'jadavpur university'], lat: 22.4985, lng: 88.3755, type: 'South Hub' },
@@ -15,7 +18,6 @@ export const POPULAR_LANDMARKS = [
   { name: 'Sector V (Tech Hub)', aliases: ['sector 5', 'sector v', 'salt lake sector 5'], lat: 22.5735, lng: 88.4331, type: 'IT Hub' },
   { name: 'Tollygunge Tram Depot', aliases: ['tollygunge', 'tollygunje', 'tolly'], lat: 22.4990, lng: 88.3471, type: 'South Hub' },
   { name: 'Dum Dum Junction', aliases: ['dum dum', 'dumdum'], lat: 22.6225, lng: 88.4200, type: 'Station' },
-  { name: 'Victoria Memorial', aliases: ['victoria', 'victoria memorial', 'maidan'], lat: 22.5448, lng: 88.3426, type: 'Monument' },
   { name: 'Kalighat Temple', aliases: ['kalighat', 'kalighat mandir'], lat: 22.5261, lng: 88.3432, type: 'Heritage' },
   { name: 'Santragachi Junction', aliases: ['santragachi', 'santragachi station'], lat: 22.5800, lng: 88.2780, type: 'Station' },
   { name: 'Shalimar Station', aliases: ['shalimar'], lat: 22.5574, lng: 88.3242, type: 'Station' },
@@ -34,31 +36,32 @@ function normalize(str) {
     .trim();
 }
 
-// Check substring / alias match
-function findEntityInText(text, entityList, matchType = 'pandal') {
-  const normText = normalize(text);
-  let bestMatch = null;
-  let bestScore = 0;
+// Math or academic syllabus detector
+export function isMathOrSyllabus(query) {
+  const q = query.trim().toLowerCase();
 
-  for (const item of entityList) {
-    const namesToCheck = [item.name];
-    if (item.aliases) namesToCheck.push(...item.aliases);
-    if (item.area) namesToCheck.push(item.area);
-
-    for (const name of namesToCheck) {
-      const normName = normalize(name);
-      if (!normName || normName.length < 3) continue;
-
-      if (normText.includes(normName)) {
-        const score = normName.length;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = { ...item, matchedName: name, entityType: matchType };
-        }
-      }
-    }
+  // Math equations / calculations
+  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|formula|logarithm|fraction)\b/i.test(q)) {
+    return true;
   }
-  return bestMatch;
+  if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) {
+    return true;
+  }
+  if (/\b(what is|calculate)\s*\d+/i.test(q)) {
+    return true;
+  }
+
+  // Academic syllabus, exams, homework, school/college questions
+  if (/\b(syllabus|homework|assignment|exam question|chapter\s*\d|physics|chemistry|biology|photosynthesis|mitochondria|newton|history question|who was|who is the president|essay on|definition of|write a program|python code|java code|javascript code|html code|c\+\+)\b/i.test(q)) {
+    return true;
+  }
+
+  return false;
+}
+
+// Bathroom / Toilet query detector
+export function isBathroomQuery(query) {
+  return /\b(bathroom|bathrooms|toilet|toilets|washroom|washrooms|restroom|restrooms|lavatory|shauchalay|sulabh|pee|urinal|wc)\b/i.test(query);
 }
 
 // Find all distinct entities in text
@@ -70,8 +73,7 @@ export function extractEntities(query) {
   for (const p of DEFAULT_PANDALS) {
     const pName = normalize(p.name);
     const pArea = normalize(p.area);
-    
-    // Core shortened name without club / committee suffixes
+
     const coreName = normalize(
       p.name.replace(/\s+(Sporting Club|Sarbojanin|Sarbojanin Durgotsav|Sarbojanin Durga Puja|Evergreen Club|Club|Sangha|Samity|Committee)$/i, '')
     );
@@ -98,6 +100,29 @@ export function extractEntities(query) {
   return found;
 }
 
+// Specific transit guidance between hubs
+function getTransitAdvice(origin, destination) {
+  const oName = (origin.name || '').toLowerCase();
+  const dName = (destination.name || '').toLowerCase();
+
+  // Howrah <-> Maidan / Esplanade
+  if ((oName.includes('howrah') && dName.includes('maidan')) || (oName.includes('maidan') && dName.includes('howrah'))) {
+    return '🚇 **Recommended Transit**: Take the **Green Line Metro** from Howrah Station to Esplanade (underwater river metro, ~6 mins), then walk 5 mins or take the Blue Line 1 stop to Maidan Station!';
+  }
+
+  // Howrah <-> Sreebhumi / Salt Lake
+  if ((oName.includes('howrah') && (dName.includes('sreebhumi') || dName.includes('salt lake'))) || (dName.includes('howrah') && (oName.includes('sreebhumi') || oName.includes('salt lake')))) {
+    return '🚇 **Recommended Transit**: Take the **Green Line Metro** from Howrah to Salt Lake / Karunamoyee, or take a direct AC bus via VIP Road to Sreebhumi.';
+  }
+
+  // North <-> South Corridor
+  if ((oName.includes('shyambazar') || oName.includes('bagbazar') || oName.includes('dum dum')) && (dName.includes('kalighat') || dName.includes('gariah') || dName.includes('maddox') || dName.includes('maidan'))) {
+    return '🚇 **Recommended Transit**: The **Kolkata Metro Blue Line** (North-South corridor) connects directly with zero road traffic!';
+  }
+
+  return '🚗 **Puja Transit Tip**: Check for traffic diversions around major pandals. Metro is the fastest option during peak evening hours (5 PM - 1 AM).';
+}
+
 // Calculate road distance, walking time, driving time
 export function calculateTravelMetrics(pointA, pointB) {
   const lat1 = Number(pointA.lat || pointA.latitude);
@@ -115,7 +140,8 @@ export function calculateTravelMetrics(pointA, pointB) {
   // Driving time during Durga Puja: average speed ~18 km/h due to traffic diversions & crowd
   const drivingMins = Math.max(3, Math.round((roadKm / 18) * 60) + 4);
 
-  const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${lat1},${lon1}&destination=${lat2},${lon2}&travelmode=walking`;
+  const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${lat1},${lon1}&destination=${lat2},${lon2}&travelmode=driving`;
+  const transitAdvice = getTransitAdvice(pointA, pointB);
 
   return {
     straightKm: Number(straightKm.toFixed(2)),
@@ -123,6 +149,7 @@ export function calculateTravelMetrics(pointA, pointB) {
     walkingMins,
     drivingMins,
     gmapsUrl,
+    transitAdvice,
   };
 }
 
@@ -149,29 +176,70 @@ export function findNearbyPandals(targetLat, targetLng, maxCount = 5, maxRadiusK
 export async function processDistanceQuery(userQuery, userLocation = null) {
   const text = normalize(userQuery);
 
-  // 1. Greetings & General Inquiries
-  if (/^(hi|hello|hey|namaste|shubho|nomoshkar|help|who are you|kemon acho)/.test(text)) {
+  // 1. Math / Syllabus / Academic Filter (Strictly reject non-puja questions)
+  if (isMathOrSyllabus(userQuery)) {
     return {
-      type: 'greeting',
-      reply: 'শুভ শারদীয়া! 🙏 I am your **Pujo Distance & Route AI Assistant**.',
+      type: 'off_topic',
+      reply: '🙏 শুভ শারদীয়া!',
       details: [
-        'You can ask me:',
-        '• "Distance from Howrah to Sreebhumi"',
-        '• "How far is Bagbazar from College Square?"',
-        '• "Find pandals near me (within 2 km)"',
-        '• "Shortest route for Maddox Square, Suruchi Sangha, and Ekdalia"',
-        '• "Nearest metro to Mohammad Ali Park"',
+        'I only assist with Kolkata Durga Puja plans, pandal distances, transit routes (e.g. "Howrah to Maidan distance how to go"), and public washrooms.',
+        'I do not solve maths, syllabus, or academic questions.',
       ],
       suggestions: [
-        'Distance: Howrah to Sreebhumi',
-        'Pandals near my GPS location',
-        'Distance: Bagbazar to College Square',
-        'Shortest route for 3 pandals',
+        'Howrah to Maidan distance',
+        'Find bathrooms near me',
+        'Shortest route for our group plan',
       ],
     };
   }
 
-  // 2. Nearby queries with GPS
+  // 2. Bathroom / Washroom / Toilet Search with direct Google Maps Link
+  if (isBathroomQuery(userQuery)) {
+    const entities = extractEntities(userQuery);
+    let targetName = 'Your Location';
+    let gmapsUrl = 'https://www.google.com/maps/search/public+toilet+washroom+kolkata';
+
+    if (entities.length > 0) {
+      targetName = entities[0].name;
+      gmapsUrl = `https://www.google.com/maps/search/public+toilet+washroom+near+${encodeURIComponent(targetName)}`;
+    } else if (userLocation && userLocation.latitude && userLocation.longitude) {
+      targetName = 'your current GPS location';
+      gmapsUrl = `https://www.google.com/maps/search/public+toilet+washroom+near+me/@${userLocation.latitude},${userLocation.longitude},15z`;
+    }
+
+    return {
+      type: 'bathroom_card',
+      reply: `🚻 Public Washrooms & Toilets near **${targetName}**:`,
+      locationName: targetName,
+      gmapsUrl,
+      details: [
+        '🚇 **Metro Stations**: All operational Kolkata Metro stations (Blue & Green lines) have clean public washrooms on concourses.',
+        '🪔 **Pandal Bio-Toilets**: KMC provides mobile bio-toilets outside all mega pandals.',
+        '🚻 **Sulabh Shauchalayas & Fuel Pumps**: Clean pay-and-use toilets available along major arterial crossings.',
+      ],
+      suggestions: [
+        'Find bathrooms near me',
+        'Howrah to Maidan distance',
+        'Pandals near my GPS location',
+      ],
+    };
+  }
+
+  // 3. Greetings & General Inquiries
+  if (/^(hi|hello|hey|namaste|shubho|nomoshkar|help|who are you|kemon acho)/.test(text)) {
+    return {
+      type: 'greeting',
+      reply: 'শুভ শারদীয়া! 🙏',
+      suggestions: [
+        'Howrah to Maidan distance',
+        'Find bathrooms near me',
+        'Distance: Bagbazar to College Square',
+        'Shortest route for our group plan',
+      ],
+    };
+  }
+
+  // 4. Nearby queries with GPS
   const isNearbyQuery = /near|closest|nearby|around me|close to me|nearest/.test(text);
   const isMyLocationQuery = /me|my location|here|current location|where i am/.test(text);
 
@@ -199,16 +267,16 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
       pandals: nearby,
       suggestions: [
         `Distance to ${nearby[0]?.name}`,
-        'Shortest route between top 3',
-        'Distance: Howrah to Bagbazar',
+        'Find bathrooms near me',
+        'Howrah to Maidan distance',
       ],
     };
   }
 
-  // 3. Extract entities mentioned
+  // 5. Extract entities mentioned
   const entities = extractEntities(userQuery);
 
-  // Case A: 2 Entities found -> Point to Point Distance calculation
+  // Case A: 2 Entities found -> Point to Point Distance & "How to Go" calculation
   if (entities.length >= 2) {
     const origin = entities[0];
     const destination = entities[1];
@@ -227,20 +295,25 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
         stops: optimized,
         suggestions: [
           `Distance from ${entities[0].name} to ${entities[1].name}`,
-          'Pandals near my GPS location',
+          'Find bathrooms near me',
         ],
       };
     }
+
+    const isHowToGo = /how to go|route|direction|directions|transit|metro|bus|cab|reach/.test(text);
 
     return {
       type: 'distance_card',
       origin,
       destination,
       metrics,
-      reply: `📍 Distance from **${origin.name}** to **${destination.name}**:`,
+      reply: isHowToGo
+        ? `🧭 Route & Distance from **${origin.name}** to **${destination.name}**:`
+        : `📍 Distance from **${origin.name}** to **${destination.name}**:`,
+      details: metrics.transitAdvice ? [metrics.transitAdvice] : undefined,
       suggestions: [
+        `Find bathrooms near ${destination.name}`,
         `Pandals near ${destination.name}`,
-        `Nearest metro to ${origin.name}`,
         'Pandals near my GPS location',
       ],
     };
@@ -258,7 +331,7 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
       pandals: nearby,
       suggestions: [
         `Distance from ${ref.name} to ${nearby[0]?.name}`,
-        'Pandals near my GPS location',
+        `Find bathrooms near ${ref.name}`,
         'Nearest metro to ' + ref.name,
       ],
     };
@@ -279,13 +352,13 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
       ].filter(Boolean),
       suggestions: [
         `How far is ${spot.name} from Howrah?`,
-        `Pandals near ${spot.name}`,
+        `Find bathrooms near ${spot.name}`,
         'Pandals near my GPS location',
       ],
     };
   }
 
-  // 4. Fallback search by keyword
+  // 6. Fallback search by keyword
   const keywordMatches = DEFAULT_PANDALS.filter(p => {
     const q = text;
     return (
@@ -304,21 +377,21 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // Fallback helpful guidance
+  // Fallback helpful guidance strictly focused on Puja plans and routes
   return {
     type: 'help',
-    reply: `I couldn't quite identify those specific locations in Kolkata. Try specifying two pandals or landmarks!`,
+    reply: `🙏 I couldn't identify those locations in Kolkata. Please ask about Puja pandals, routes, or distances!`,
     details: [
-      'Example searches:',
-      '• "Distance between Sreebhumi and Bagbazar"',
-      '• "How far is College Square from Sealdah?"',
-      '• "Show pandals near Salt Lake"',
-      '• "Nearest pandals to me"',
+      'Example questions:',
+      '• "Howrah to Maidan distance how to go"',
+      '• "Distance between Bagbazar and College Square"',
+      '• "Find bathrooms near me"',
+      '• "Pandals near Salt Lake"',
     ],
     suggestions: [
-      'Distance: Howrah to Sreebhumi',
+      'Howrah to Maidan distance',
+      'Find bathrooms near me',
       'Distance: Bagbazar to College Square',
-      'Pandals near my GPS location',
     ],
   };
 }

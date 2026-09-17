@@ -12,19 +12,11 @@ const INITIAL_MESSAGES = [
     id: 'msg-init',
     sender: 'bot',
     type: 'greeting',
-    reply: 'শুভ শারদীয়া! 🙏 Welcome to **Pujo Distance & Route AI**.',
-    details: [
-      'Ask me distances, travel times, and shortest routes between any Kolkata Durga Puja pandals or stations!',
-      '• "How far is Bagbazar from College Square?"',
-      '• "Distance from Howrah to Sreebhumi"',
-      '• "Pandals near my current GPS location"',
-      '• "Shortest route: Maddox Square, Suruchi Sangha & Ekdalia"',
-    ],
+    reply: 'শুভ শারদীয়া! 🙏',
     suggestions: [
-      'Distance: Howrah to Sreebhumi',
-      'Bagbazar to College Square',
-      'Pandals near my GPS location',
-      'Shortest route for 3 pandals',
+      'Howrah to Maidan distance',
+      'Find bathrooms near me',
+      'Shortest route for our group plan',
     ],
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   },
@@ -40,35 +32,25 @@ export default function DistanceChatbot({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const getInitialMessages = () => {
-    if (groupSpots && groupSpots.length > 0) {
-      const spotNames = groupSpots.map(s => s.name || s.spot?.name).filter(Boolean);
-      const suggestions = [];
-      if (spotNames.length >= 2) {
-        suggestions.push(`Distance: ${spotNames[0]} to ${spotNames[1]}`);
-      }
-      suggestions.push('Shortest route for our group plan');
-      if (startLocation) {
-        suggestions.push(`Distance from ${startLocation} to ${spotNames[0] || 'first stop'}`);
-      }
-      suggestions.push('Pandals near my GPS location');
-
-      return [
-        {
-          id: 'msg-init',
-          sender: 'bot',
-          type: 'greeting',
-          reply: `শুভ শারদীয়া! 🙏 I am ready to assist with **${groupName || 'your group plan'}** (${spotNames.length} spots planned).`,
-          details: [
-            `• Start Point: ${startLocation || 'Kolkata Central'}`,
-            `• Planned Stops: ${spotNames.slice(0, 4).join(', ')}${spotNames.length > 4 ? '…' : ''}`,
-            'Ask me distances between your planned spots, walking times, or directions!',
-          ],
-          suggestions,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }
-      ];
+    const spotNames = (groupSpots || []).map(s => s.name || s.spot?.name).filter(Boolean);
+    const suggestions = [];
+    if (spotNames.length >= 2) {
+      suggestions.push(`Distance: ${spotNames[0]} to ${spotNames[1]}`);
     }
-    return INITIAL_MESSAGES;
+    suggestions.push('Howrah to Maidan distance');
+    suggestions.push('Find bathrooms near me');
+    suggestions.push('Shortest route for our group plan');
+
+    return [
+      {
+        id: 'msg-init',
+        sender: 'bot',
+        type: 'greeting',
+        reply: 'শুভ শারদীয়া! 🙏',
+        suggestions,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+    ];
   };
 
   const [messages, setMessages] = useState(getInitialMessages);
@@ -368,7 +350,49 @@ export default function DistanceChatbot({
                         >
                           <Navigation size={14} />
                           Open Directions in Google Maps
-                          <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Washrooms & Toilets Card with direct Google Maps search link */}
+                    {m.type === 'bathroom_card' && m.gmapsUrl && (
+                      <div className="distbot-card" style={{
+                        background: 'rgba(26, 115, 232, 0.08)',
+                        border: '1px solid rgba(66, 133, 244, 0.35)',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        marginTop: '8px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>🚻</span>
+                          <span style={{ fontWeight: '700', fontSize: '13px', color: '#60a5fa' }}>
+                            Public Washrooms & Toilets
+                          </span>
+                        </div>
+
+                        <a
+                          href={m.gmapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="distbot-gmaps-btn"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            background: '#1a73e8',
+                            color: '#ffffff',
+                            fontWeight: '700',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            textDecoration: 'none',
+                            marginTop: '8px',
+                            boxShadow: '0 4px 12px rgba(26, 115, 232, 0.35)'
+                          }}
+                        >
+                          <Navigation size={15} />
+                          Open Washrooms in Google Maps
+                          <ExternalLink size={13} />
                         </a>
                       </div>
                     )}

@@ -21,10 +21,10 @@ api.interceptors.response.use(
     if (
       typeof res.data === 'string' &&
       (res.data.includes('<!DOCTYPE html') ||
-       res.data.includes('<!doctype html') ||
-       res.data.includes('<html') ||
-       res.data.includes('<head') ||
-       res.headers['content-type']?.includes('text/html'))
+        res.data.includes('<!doctype html') ||
+        res.data.includes('<html') ||
+        res.data.includes('<head') ||
+        res.headers['content-type']?.includes('text/html'))
     ) {
       const err = new Error('HTML response received from API fallback.');
       err.response = { status: 404, data: null };
