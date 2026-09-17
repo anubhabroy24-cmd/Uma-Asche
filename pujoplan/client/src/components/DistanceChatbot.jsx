@@ -51,6 +51,30 @@ export default function DistanceChatbot({ defaultOpen = false }) {
     }
   }, [messages, isOpen, isTyping]);
 
+  // Native Android Hardware / Gesture Back Button handling
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Push history state so Android back button closes the bot instead of leaving the app
+    window.history.pushState({ modal: 'distbot' }, '');
+
+    const handlePopState = () => {
+      setIsOpen(false);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen]);
+
+  const handleClose = () => {
+    setIsOpen(false);
+    if (window.history.state?.modal === 'distbot') {
+      window.history.back();
+    }
+  };
+
   // Fetch device GPS coordinates
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -159,6 +183,11 @@ export default function DistanceChatbot({ defaultOpen = false }) {
       {/* Chat Window */}
       {isOpen && (
         <div className="distbot-window" role="dialog" aria-label="Pujo Distance Assistant">
+          {/* Mobile Bottom Sheet Drag Handle */}
+          <div className="distbot-mobile-handle-bar">
+            <div className="distbot-mobile-handle" />
+          </div>
+
           {/* Header */}
           <div className="distbot-header">
             <div className="distbot-header__info">
@@ -186,7 +215,7 @@ export default function DistanceChatbot({ defaultOpen = false }) {
               </button>
               <button
                 className="distbot-header__btn"
-                onClick={() => setIsOpen(false)}
+                onClick={handleClose}
                 title="Close chat"
               >
                 <X size={18} />
