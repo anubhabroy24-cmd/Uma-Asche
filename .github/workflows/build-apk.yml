@@ -15,6 +15,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -30,18 +39,9 @@ jobs:
         working-directory: ./pujoplan/client
         run: npm run build
 
-      - name: Sync Capacitor Android
+      - name: Copy & Sync Web Assets to Android
         working-directory: ./pujoplan/client
         run: npx cap sync android
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
 
       - name: Make Gradlew Executable
         working-directory: ./pujoplan/client/android
