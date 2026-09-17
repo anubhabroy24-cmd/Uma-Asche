@@ -99,6 +99,7 @@ export function AuthProvider({ children }) {
         e.code === 'auth/popup-closed-by-user' ? 'Sign-in cancelled.' :
         e.code === 'auth/popup-blocked'        ? 'Popup blocked. Allow popups for this site.' :
         e.code === 'auth/network-request-failed' ? 'Network error. Check your connection.' :
+        e.code === 'auth/unauthorized-domain'  ? 'Domain not authorized in Firebase Console. Please add this Netlify domain to Firebase Auth > Settings > Authorized domains.' :
         (e.response?.data?.error || e.message || 'Sign-in failed. Please try again.');
       setError(msg);
       throw new Error(msg);
