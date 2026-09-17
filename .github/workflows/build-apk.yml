@@ -28,7 +28,7 @@ jobs:
 
       - name: Install Frontend Dependencies
         working-directory: ./pujoplan/client
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Web Production Bundle
         working-directory: ./pujoplan/client
