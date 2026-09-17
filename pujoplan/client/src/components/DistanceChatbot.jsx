@@ -4,7 +4,7 @@ import {
   ExternalLink, RotateCcw, Footprints, Car,
   ChevronDown, Flame, Sparkles
 } from 'lucide-react';
-import { processDistanceQuery } from '../utils/distanceBotEngine';
+import { processDistanceQuery, isMathOrSyllabus } from '../utils/distanceBotEngine';
 import { getReliableCurrentLocation } from '../services/routingService';
 import { sendGeminiMessage } from '../services/geminiService';
 import './DistanceChatbot.css';
@@ -48,6 +48,7 @@ export default function DistanceChatbot({
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState('');
   const messagesEndRef = useRef(null);
+  const localCacheRef = useRef(new Map());
 
   // Auto scroll to bottom
   const scrollToBottom = () => {
@@ -119,8 +120,38 @@ export default function DistanceChatbot({
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    setIsTyping(true);
 
+    // 1. Instant 0ms Math Refusal
+    if (isMathOrSyllabus(text)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'bot-' + Date.now(),
+          sender: 'bot',
+          type: 'text',
+          reply: '🙏 শুভ শারদীয়া! I only assist with Kolkata Durga Puja plans, pandal distances, transit routes, and public amenities. I do not solve math, syllabus, or academic questions.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+      return;
+    }
+
+    // 2. Instant 0ms Client Cache Hit
+    const normKey = text.toLowerCase().trim();
+    if (localCacheRef.current.has(normKey)) {
+      const cachedMsg = localCacheRef.current.get(normKey);
+      setMessages((prev) => [
+        ...prev,
+        {
+          ...cachedMsg,
+          id: 'bot-' + Date.now(),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+      return;
+    }
+
+    setIsTyping(true);
     const activeLoc = overrideLoc || userLocation;
 
     try {
@@ -141,6 +172,7 @@ export default function DistanceChatbot({
         source: 'gemini',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
+      localCacheRef.current.set(normKey, botMsg);
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
       console.warn('AI call error, using local fallback:', err);
