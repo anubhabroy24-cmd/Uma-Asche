@@ -489,6 +489,9 @@ const PujaMap = forwardRef(function PujaMap({
   useImperativeHandle(ref, () => ({
     recenterMe: handleRecenterMe,
     fitRoute: handleFitRoute,
+    invalidateSize: () => {
+      mapInstanceRef.current?.invalidateSize();
+    },
   }));
 
   return (

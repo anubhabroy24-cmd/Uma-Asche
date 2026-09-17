@@ -17,7 +17,7 @@ import { getReliableCurrentLocation } from '../services/routingService';
 import {
   MapPin, Plus, ThumbsUp, Trash2, Copy, Share2,
   Check, Star, Route, Users, ChevronDown, ChevronUp, AlertTriangle,
-  MessageSquare, Navigation, ArrowLeft, EyeOff,
+  MessageSquare, Navigation, ArrowLeft, EyeOff, Compass,
 } from 'lucide-react';
 import './GroupDashboard.css';
 
@@ -206,13 +206,23 @@ export default function GroupDashboard() {
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('plan'); // 'plan' | 'chat'
+  const [activeTab, setActiveTab] = useState('plan'); // 'plan' | 'route' | 'ai' | 'chat'
   const [routeData, setRouteData] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+
+  // Invalidate map bounds on tab switch to route
+  useEffect(() => {
+    if (activeTab === 'route') {
+      const timer = setTimeout(() => {
+        mapComponentRef.current?.invalidateSize();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
 
   // Live location & navigation states
   const [locations, setLocations] = useState([]);
@@ -644,7 +654,7 @@ export default function GroupDashboard() {
           </span>
         </div>
 
-        {/* Segmented Navigation Tabs */}
+        {/* Segmented Navigation Tabs: Plan, Route, AI, Chat */}
         <div className="gd__tabs">
           <button
             type="button"
@@ -652,7 +662,23 @@ export default function GroupDashboard() {
             onClick={() => setActiveTab('plan')}
           >
             <MapPin size={14} />
-            <span>Plan & Route</span>
+            <span>Plan</span>
+          </button>
+          <button
+            type="button"
+            className={`gd__tab ${activeTab === 'route' ? 'gd__tab--active' : ''}`}
+            onClick={() => setActiveTab('route')}
+          >
+            <Route size={14} />
+            <span>Route</span>
+          </button>
+          <button
+            type="button"
+            className={`gd__tab ${activeTab === 'ai' ? 'gd__tab--active' : ''}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Compass size={14} />
+            <span>AI</span>
           </button>
           <button
             type="button"
@@ -664,12 +690,7 @@ export default function GroupDashboard() {
           </button>
         </div>
 
-        {activeTab === 'chat' && (
-          <div className="gd__tab-pane">
-            <GroupChat groupId={id} currentUser={user} />
-          </div>
-        )}
-
+        {/* ── 1. Plan Tab (Pandal Selection & Management) ── */}
         {activeTab === 'plan' && (
           <div className="gd__tab-pane">
             {/* Invite strip */}
@@ -778,9 +799,35 @@ export default function GroupDashboard() {
               </div>
             )}
 
-            <div className="divider" />
+            {/* Admin danger zone */}
+            {isAdmin && (
+              <>
+                <div className="divider" />
+                <div className="gd__danger">
+                  <p className="section-title" style={{ color: 'var(--red)', marginBottom: 8 }}>DANGER ZONE</p>
+                  {confirmDel ? (
+                    <div className="gd__confirm">
+                      <AlertTriangle size={16} color="var(--red)" />
+                      <span>This cannot be undone.</span>
+                      <button className="btn btn-red btn-sm" onClick={handleDeleteGroup}>Delete</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDel(false)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-outline btn-sm"
+                      style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
+                      onClick={() => setConfirmDel(true)}>
+                      <Trash2 size={13} /> Delete Group
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
-            {/* Google Maps-Style Navigation System */}
+        {/* ── 2. Route Tab (Map, Routing, Location Tracking & Red Track to Start) ── */}
+        {activeTab === 'route' && (
+          <div className="gd__tab-pane">
             <div className="gd__route-head">
               <span className="section-title" style={{ marginBottom: 0 }}>NAVIGATION & ROUTE</span>
               <button
@@ -837,41 +884,27 @@ export default function GroupDashboard() {
                 onCloseToast={() => setToastMessage('')}
               />
             </div>
-
-            {/* Admin danger zone */}
-            {isAdmin && (
-              <>
-                <div className="divider" />
-                <div className="gd__danger">
-                  <p className="section-title" style={{ color: 'var(--red)', marginBottom: 8 }}>DANGER ZONE</p>
-                  {confirmDel ? (
-                    <div className="gd__confirm">
-                      <AlertTriangle size={16} color="var(--red)" />
-                      <span>This cannot be undone.</span>
-                      <button className="btn btn-red btn-sm" onClick={handleDeleteGroup}>Delete</button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDel(false)}>Cancel</button>
-                    </div>
-                  ) : (
-                    <button className="btn btn-outline btn-sm"
-                      style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
-                      onClick={() => setConfirmDel(true)}>
-                      <Trash2 size={13} /> Delete Group
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
           </div>
         )}
 
-        {/* Distance Chatbot: strictly inside 9:16 frame, only when group is created & plan is done */}
-        {group && group.spots && group.spots.length > 0 && (
-          <DistanceChatbot
-            groupSpots={group.spots.map(s => s.spot || s)}
-            groupName={group.name}
-            startLocation={group.startLocation}
-            waypoints={waypoints}
-          />
+        {/* ── 3. AI Assistant Tab (Distance & Route Bot) ── */}
+        {activeTab === 'ai' && (
+          <div className="gd__tab-pane" style={{ marginTop: 2 }}>
+            <DistanceChatbot
+              embedded={true}
+              groupSpots={group?.spots ? group.spots.map(s => s.spot || s) : []}
+              groupName={group?.name}
+              startLocation={group?.startLocation}
+              waypoints={waypoints}
+            />
+          </div>
+        )}
+
+        {/* ── 4. Chat Tab (Friends Group Chat) ── */}
+        {activeTab === 'chat' && (
+          <div className="gd__tab-pane">
+            <GroupChat groupId={id} currentUser={user} />
+          </div>
         )}
       </div>
     </AppLayout>

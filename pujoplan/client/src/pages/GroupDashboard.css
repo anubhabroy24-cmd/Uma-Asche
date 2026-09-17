@@ -16,8 +16,8 @@
 /* ── Segmented Navigation Tabs ───── */
 .gd__tabs {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
   background: var(--black-2);
   padding: 4px;
   border-radius: var(--r-md);
@@ -29,17 +29,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 4px;
+  gap: 5px;
+  padding: 8px 2px;
   background: transparent;
   border: none;
   border-radius: var(--r-sm);
   color: var(--gray-mid);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
+}
+
+.gd__tab svg {
+  flex-shrink: 0;
 }
 
 .gd__tab:hover {

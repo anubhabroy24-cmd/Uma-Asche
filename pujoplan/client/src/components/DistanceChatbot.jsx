@@ -20,12 +20,13 @@ const INITIAL_MESSAGES = [
 
 export default function DistanceChatbot({
   defaultOpen = false,
+  embedded = false,
   groupSpots = [],
   groupName = '',
   startLocation = '',
   waypoints = []
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isOpen, setIsOpen] = useState(embedded ? true : defaultOpen);
 
   const getInitialMessages = () => {
     return [
@@ -159,9 +160,9 @@ export default function DistanceChatbot({
   };
 
   return (
-    <div className="distbot-root">
+    <div className={`distbot-root ${embedded ? 'distbot-root--embedded' : ''}`}>
       {/* Floating Trigger Button */}
-      {!isOpen && (
+      {!isOpen && !embedded && (
         <button
           className="distbot-trigger"
           onClick={() => setIsOpen(true)}
@@ -181,12 +182,14 @@ export default function DistanceChatbot({
       )}
 
       {/* Chat Window */}
-      {isOpen && (
+      {(isOpen || embedded) && (
         <div className="distbot-window" role="dialog" aria-label="Pujo Distance Assistant">
           {/* Mobile Bottom Sheet Drag Handle */}
-          <div className="distbot-mobile-handle-bar">
-            <div className="distbot-mobile-handle" />
-          </div>
+          {!embedded && (
+            <div className="distbot-mobile-handle-bar">
+              <div className="distbot-mobile-handle" />
+            </div>
+          )}
 
           {/* Header */}
           <div className="distbot-header">
@@ -213,13 +216,15 @@ export default function DistanceChatbot({
               >
                 <RotateCcw size={15} />
               </button>
-              <button
-                className="distbot-header__btn"
-                onClick={handleClose}
-                title="Close chat"
-              >
-                <X size={18} />
-              </button>
+              {!embedded && (
+                <button
+                  className="distbot-header__btn"
+                  onClick={handleClose}
+                  title="Close chat"
+                >
+                  <X size={18} />
+                </button>
+              )}
             </div>
           </div>
 
