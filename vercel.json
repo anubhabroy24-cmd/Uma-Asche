@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd pujoplan/client && npm install && npm run build",
+  "outputDirectory": "pujoplan/client/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
