@@ -63,6 +63,19 @@ const PREWARMED_RESPONSES = [
 • **Bagbazar Launch Ghat:** Sulabh Shauchalaya near the ghat entrance on Strand Bank Road.
 • **Map Finder:** [🗺️ Open Washrooms in Google Maps](https://www.google.com/maps/search/public+toilet+washroom+near+Bagbazar+Kolkata)`,
     gmapsUrl: 'https://www.google.com/maps/search/public+toilet+washroom+near+Bagbazar+Kolkata'
+  },
+  {
+    pattern: /(bar|bars|pub|pubs|alcohol|beer|liquor|lounge).*(maidan|park\s*street)/i,
+    reply: `🍻 **Bars & Pubs near Maidan / Park Street:**
+
+• **Olypub (Park Street):** Legendary heritage budget pub (~1.2 km from Maidan, landmark spot).
+• **Someplace Else & Roxy (The Park Hotel):** Iconic live music British pub & upscale lounge.
+• **Trincas (Park Street):** 1960s retro live music bar & restaurant.
+• **Peter Cat & Mocambo:** Heritage dining famous for Chelo Kebabs and classic cocktails.
+• **Broadway Hotel Bar (Chandni Chowk):** Heritage old-Kolkata tavern (~1.8 km).
+
+[🗺️ Search All Bars near Maidan in Google Maps](https://www.google.com/maps/search/bars+pubs+lounges+near+Maidan+Park+Street+Kolkata)`,
+    gmapsUrl: 'https://www.google.com/maps/search/bars+pubs+lounges+near+Maidan+Park+Street+Kolkata'
   }
 ];
 
@@ -76,13 +89,13 @@ function buildSystemInstruction(context = {}) {
     ? groupSpots.slice(0, 8).map((s, i) => `${i + 1}. ${s.name || s.spot?.name || 'Pandal'}`).join(', ')
     : 'None';
 
-  return `You are the ultra-fast Durga Puja 2026 AI Assistant for Kolkata.
-SPEED & FORMAT RULES:
-1. Be extremely fast, concise, and helpful. Use 2-3 brief bullet points maximum.
+  return `You are the intelligent Durga Puja 2026 AI Assistant for Kolkata.
+DOMAIN & FORMAT RULES:
+1. Help with Kolkata Durga Puja 2026, pandals, routes, travel distances, metro, public washrooms, and food & nightlife amenities (restaurants, street food, bars & pubs near landmarks).
 2. STRICT REFUSAL: Refuse math, school syllabus, academic questions with: "🙏 শুভ শারদীয়া! I only assist with Kolkata Durga Puja plans, pandal distances, transit routes, and public amenities."
-3. TRANSIT & DISTANCE: Give exact road km, metro connection (Blue Line or underwater Green Line), and driving/walking estimates. Always add: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<ORIGIN>&destination=<DESTINATION>)
-4. WASHROOMS: Point to Metro concourses / KMC bio-toilets and add: [🗺️ Open Washrooms in Google Maps](https://www.google.com/maps/search/public+toilet+washroom+near+<LOCATION>)
-5. Context: Plan "${groupName || 'Pandal Hopper'}", Start "${startLocation || 'Kolkata Central'}", Stops: ${spotNames}.`;
+3. AMENITIES (BARS/RESTAURANTS/WASHROOMS): When asked for bars, pubs, or restaurants near an area (e.g. Maidan, Park Street, Salt Lake), suggest the most famous nearby spots and always include a direct clickable Google Maps search link: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata)
+4. TRANSIT & DISTANCES: Give exact road km, metro connection (Blue Line or underwater Green Line), and driving/walking estimates with: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<ORIGIN>&destination=<DESTINATION>)
+5. Context: Plan "${groupName || 'Pandal Hopper'}", Start "${startLocation || 'Kolkata Central'}", Stops: ${spotNames}. Keep answers helpful, fast, and structured with bullet points.`;
 }
 
 /**
@@ -159,7 +172,7 @@ router.post('/chat', async (req, res, next) => {
       },
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 220, // Crisp & fast
+        maxOutputTokens: 400,
         topP: 0.85,
       },
     };
@@ -170,7 +183,7 @@ router.post('/chat', async (req, res, next) => {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s max per model
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s generous timeout
 
         const response = await fetch(endpoint, {
           method: 'POST',

@@ -35,19 +35,14 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── Rate Limiting ────────────────────────────────────────────
-app.use('/api/', rateLimit({
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },
-}));
-
-app.use('/api/auth/', rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  message: { error: 'Too many auth attempts, please try again later.' },
-}));
+});
+app.use('/api/', apiLimiter);
 
 // ─── Health ───────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

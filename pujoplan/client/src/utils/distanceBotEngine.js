@@ -319,7 +319,74 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // Case B: 1 Entity found + "near" / "nearest"
+  // Check specific non-pandal amenity queries
+  const isBar = /\b(bar|bars|pub|pubs|beer|liquor|wine|cocktail|lounge|brewery|club|nightclub)\b/i.test(text);
+  const isFood = /\b(food|restaurant|restaurants|dhaba|cafe|coffee|biryani|roll|rolls|sweets|mithai|eating|lunch|dinner|breakfast|snack|street food)\b/i.test(text);
+  const isMedical = /\b(hospital|hospitals|clinic|doctor|pharmacy|medicine|chemist|first aid|medical|ambulance)\b/i.test(text);
+
+  if (isBar) {
+    const ref = entities[0] || { name: 'Maidan / Park Street', lat: 22.5520, lng: 88.3490 };
+    const gmapsUrl = `https://www.google.com/maps/search/bars+pubs+lounges+near+${encodeURIComponent(ref.name + ' Kolkata')}`;
+    return {
+      type: 'amenity_card',
+      amenityType: 'bar',
+      gmapsUrl,
+      reply: `🍻 **Bars & Pubs near ${ref.name}:**\n\n` +
+        `• **Olypub (Park Street):** Kolkata's legendary classic budget pub (~1.2 km from Maidan).\n` +
+        `• **Someplace Else & Roxy (The Park Hotel):** Iconic British pub with live music.\n` +
+        `• **Trincas (Park Street):** Vintage 1960s retro live music bar & dining.\n` +
+        `• **Peter Cat & Mocambo (Park Street):** Heritage dining with cocktails & Chelo Kebabs.\n` +
+        `• **Broadway Hotel Bar (Chandni Chowk):** Old-school heritage tavern (~1.8 km).\n\n` +
+        `[🗺️ Search All Bars near ${ref.name} on Google Maps](${gmapsUrl})`,
+      suggestions: [
+        'Bars near Park Street',
+        `Food near ${ref.name}`,
+        `Find bathrooms near ${ref.name}`,
+        `Pandals near ${ref.name}`,
+      ],
+    };
+  }
+
+  if (isFood) {
+    const ref = entities[0] || { name: 'Kolkata Central', lat: 22.5726, lng: 88.3639 };
+    const gmapsUrl = `https://www.google.com/maps/search/restaurants+and+food+near+${encodeURIComponent(ref.name + ' Kolkata')}`;
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `🍽️ **Food & Restaurants near ${ref.name}:**\n\n` +
+        `• **Park Street Restaurant Row:** Peter Cat, Mocambo, Kusum Rolls, Flurys.\n` +
+        `• **Dacres Lane (Esplanade):** Famous heritage street food hub (Chitto Da's).\n` +
+        `• **Arsalan / Shiraz (Park Circus):** Legendary Kolkata Biryani & Chaap.\n\n` +
+        `[🗺️ Search All Restaurants near ${ref.name} on Google Maps](${gmapsUrl})`,
+      suggestions: [
+        'Food near Park Street',
+        `Bars near ${ref.name}`,
+        `Pandals near ${ref.name}`,
+      ],
+    };
+  }
+
+  if (isMedical) {
+    const ref = entities[0] || { name: 'Kolkata', lat: 22.5726, lng: 88.3639 };
+    const gmapsUrl = `https://www.google.com/maps/search/hospital+medical+pharmacy+near+${encodeURIComponent(ref.name + ' Kolkata')}`;
+    return {
+      type: 'amenity_card',
+      amenityType: 'medical',
+      gmapsUrl,
+      reply: `🏥 **Medical & Emergency Services near ${ref.name}:**\n\n` +
+        `• **SSKM Hospital (IPGMER):** Major Govt emergency hospital near Rabindra Sadan.\n` +
+        `• **Calcutta Medical College:** College Street / Central area.\n` +
+        `• **Durga Puja Medical Booths:** Kolkata Police / Red Cross booths outside major pandals.\n\n` +
+        `[🗺️ Search Hospitals & Pharmacies on Google Maps](${gmapsUrl})`,
+      suggestions: [
+        `Pandals near ${ref.name}`,
+        `Find bathrooms near ${ref.name}`,
+      ],
+    };
+  }
+
+  // Case B: 1 Entity found + "near" / "nearest" (Pandal proximity search)
   if (entities.length === 1 && (isNearbyQuery || /around|from/.test(text))) {
     const ref = entities[0];
     const nearby = findNearbyPandals(ref.lat, ref.lng, 5, 8).filter(p => p.name !== ref.name);
