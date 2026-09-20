@@ -1,7 +1,16 @@
+/* Shared tab styles from GroupDashboard */
+@import './GroupDashboard.css';
+
+/* Override: solo plan has 3 tabs not 4 */
+.spd .gd__tabs {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ── Solo Plan Detail ── */
 .spd__meta {
   display: flex; flex-wrap: wrap; gap: 6px;
   font-size: .78rem; color: var(--gray-mid);
-  margin-bottom: var(--s2);
+  margin-bottom: var(--s3);
 }
 
 .spd__spots-head {

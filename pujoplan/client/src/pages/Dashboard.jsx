@@ -32,9 +32,6 @@ export default function Dashboard() {
             <p className="section-title" style={{ marginBottom: 3 }}>DURGA PUJA 2026</p>
             <h1 className="db__name">শুভ শারদীয়া 🙏, {firstName}</h1>
           </div>
-          {user?.profileImage && (
-            <img src={user.profileImage} alt="" className="db__avatar" referrerPolicy="no-referrer" />
-          )}
         </div>
 
         {/* Main Hub Buttons: View Group Plans & View Solo Plans */}

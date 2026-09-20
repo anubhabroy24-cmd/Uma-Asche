@@ -46,6 +46,8 @@ export default function GmapsBottomSheet({
   onFocusMember,
   toastMessage = '',
   onCloseToast,
+  visitedStops = new Set(),
+  onMarkVisited,
 }) {
   // Snap point states: 'peek' (~100px) | 'half' (~45vh) | 'full' (~85vh)
   const [snap, setSnap] = useState('half');
@@ -321,53 +323,7 @@ export default function GmapsBottomSheet({
             </button>
           </div>
 
-          {/* Search Input for Nominatim Geocoding */}
-          <div className="gmaps-search-box">
-            <Search size={16} className="gmaps-search-icon" />
-            <input
-              type="text"
-              className="gmaps-search-input"
-              placeholder="Search pandal, street, or area in Kolkata…"
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
-            {searchLoading && (
-              <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2, marginRight: 8 }} />
-            )}
-            {searchQuery && (
-              <button
-                type="button"
-                className="gmaps-search-clear"
-                onClick={() => {
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
 
-          {/* Autocomplete Search Dropdown */}
-          {searchResults.length > 0 && (
-            <div className="gmaps-search-results-dropdown">
-              {searchResults.map((res, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="gmaps-search-result-item"
-                  onClick={() => handleSelectSearchResult(res)}
-                >
-                  <MapPin size={16} className="gmaps-result-pin" />
-                  <div className="gmaps-result-texts">
-                    <span className="gmaps-result-name">{res.name}</span>
-                    <span className="gmaps-result-full">{res.fullName}</span>
-                  </div>
-                  <span className="gmaps-result-add-badge">+ Add</span>
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Waypoints & Stop Reordering Section with Nearest-Neighbor Order & Live Distances */}
           <div className="gmaps-stops-section">
@@ -378,24 +334,12 @@ export default function GmapsBottomSheet({
                 </span>
                 <span className="gmaps-stops-count-tag">
                   {Math.max(0, waypoints.length - 1)} pandals
+                  {visitedStops.size > 0 && (
+                    <span className="gmaps-visited-count-tag"> · {visitedStops.size} visited</span>
+                  )}
                 </span>
               </div>
-              <div className="gmaps-stops-header-actions">
-                {onOptimizeNearestNeighbor && (
-                  <button
-                    type="button"
-                    className="gmaps-optimize-btn"
-                    onClick={onOptimizeNearestNeighbor}
-                    title="Re-run Nearest-Neighbor Greedy Algorithm from start position"
-                  >
-                    <Zap size={13} />
-                    <span>Auto-Order</span>
-                  </button>
-                )}
-                <span className="gmaps-reorder-hint">
-                  <ArrowUpDown size={12} /> Drag to reorder
-                </span>
-              </div>
+
             </div>
 
             {/* Live Distance Summary Strip */}
@@ -429,12 +373,13 @@ export default function GmapsBottomSheet({
             <div className="gmaps-stops-list">
               {waypoints.map((wp, index) => {
                 const isStart = index === 0;
+                const isVisited = !isStart && visitedStops.has(index);
                 return (
                   <div
                     key={wp.id || `${wp.lat}-${wp.lng}-${index}`}
                     className={`gmaps-stop-row ${
                       draggedStopIdx === index ? 'gmaps-stop-row--dragging' : ''
-                    } ${isStart ? 'gmaps-stop-row--start' : ''}`}
+                    } ${isStart ? 'gmaps-stop-row--start' : ''} ${isVisited ? 'gmaps-stop-row--visited' : ''}`}
                     draggable
                     onDragStart={() => setDraggedStopIdx(index)}
                     onDragOver={(e) => handleDragOverStop(e, index)}
@@ -444,23 +389,23 @@ export default function GmapsBottomSheet({
                       <GripHorizontal size={16} />
                     </div>
 
-                    <div className={`gmaps-stop-badge ${isStart ? 'gmaps-stop-badge--start' : ''}`}>
-                      {isStart ? 'S' : index}
+                    <div className={`gmaps-stop-badge ${isStart ? 'gmaps-stop-badge--start' : ''} ${isVisited ? 'gmaps-stop-badge--visited' : ''}`}>
+                      {isVisited ? '✓' : isStart ? 'S' : index}
                     </div>
 
                     <div className="gmaps-stop-info">
                       <div className="gmaps-stop-title-row">
                         {!isStart && (
-                          <span className="gmaps-stop-order-num">{index}.</span>
+                          <span className="gmaps-stop-order-num" style={{ color: isVisited ? '#34a853' : undefined }}>{index}.</span>
                         )}
-                        <span className="gmaps-stop-name">
+                        <span className={`gmaps-stop-name ${isVisited ? 'gmaps-stop-name--visited' : ''}`}>
                           {wp.name || `Pandal ${index}`}
                         </span>
                       </div>
 
                       <div className="gmaps-stop-meta-row">
                         <span className="gmaps-stop-sub">
-                          {isStart ? 'Starting Location' : `Stop #${index}`}
+                          {isStart ? 'Starting Location' : isVisited ? '✅ Visited' : `Stop #${index}`}
                         </span>
                         {!isStart && wp.legDistanceKm !== undefined && (
                           <span className="gmaps-leg-dist-badge">
@@ -474,6 +419,21 @@ export default function GmapsBottomSheet({
                         )}
                       </div>
                     </div>
+
+                    {!isStart && onMarkVisited && (
+                      <button
+                        type="button"
+                        className={`gmaps-visited-toggle-btn ${isVisited ? 'gmaps-visited-toggle-btn--done' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMarkVisited(index);
+                        }}
+                        title={isVisited ? 'Unmark as visited' : 'Mark as visited'}
+                        aria-label={isVisited ? `Unmark stop ${index}` : `Mark stop ${index} as visited`}
+                      >
+                        {isVisited ? '↩' : '✓'}
+                      </button>
+                    )}
 
                     {!isStart && (
                       <button

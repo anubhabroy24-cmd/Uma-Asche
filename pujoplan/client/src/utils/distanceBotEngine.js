@@ -36,28 +36,43 @@ function normalize(str) {
     .trim();
 }
 
-// Math or academic syllabus detector
-export function isMathOrSyllabus(query) {
+// Image generation, academic homework/study, research paper detector
+export function isDisallowedQuery(query) {
+  if (!query) return false;
   const q = query.trim().toLowerCase();
 
-  // Math equations / calculations
-  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|formula|logarithm|fraction)\b/i.test(q)) {
+  // 1. Image generation requests
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic)\b/i.test(q)) {
+    return true;
+  }
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|imagine\s+a)\b/i.test(q)) {
+    return true;
+  }
+
+  // 2. Pure academic homework, school/college studies & coding homework
+  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) {
     return true;
   }
   if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) {
     return true;
   }
-  if (/\b(what is|calculate)\s*\d+/i.test(q)) {
+  if (/\b(what is|calculate)\s*\d+\s*[\+\-\*\/]/i.test(q)) {
+    return true;
+  }
+  if (/\b(syllabus|homework|school assignment|exam question|chapter\s*\d|physics numerical|chemistry lab|mitochondria|photosynthesis|newton's\s*law|write a program|write python code|write c\+\+|write java code)\b/i.test(q)) {
     return true;
   }
 
-  // Academic syllabus, exams, homework, school/college questions
-  if (/\b(syllabus|homework|assignment|exam question|chapter\s*\d|physics|chemistry|biology|photosynthesis|mitochondria|newton|history question|who was|who is the president|essay on|definition of|write a program|python code|java code|javascript code|html code|c\+\+)\b/i.test(q)) {
+  // 3. In-depth academic research papers, thesis, literature review
+  if (/\b(research paper|academic thesis|dissertation|literature review|scholarly citation|peer-reviewed journal)\b/i.test(q)) {
     return true;
   }
 
   return false;
 }
+
+// Backward compatibility alias
+export const isMathOrSyllabus = isDisallowedQuery;
 
 // Bathroom / Toilet query detector
 export function isBathroomQuery(query) {

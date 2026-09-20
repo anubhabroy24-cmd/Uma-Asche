@@ -11,10 +11,29 @@ export default function GroupPlans() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getMyGroups()
-      .then(r => setGroups(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setGroups([]))
-      .finally(() => setLoading(false));
+    let isMounted = true;
+    const fetchGroups = () => {
+      getMyGroups()
+        .then(r => {
+          if (isMounted) setGroups(Array.isArray(r.data) ? r.data : []);
+        })
+        .catch(() => {
+          if (isMounted) setGroups([]);
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
+
+    fetchGroups();
+    const interval = setInterval(fetchGroups, 3000);
+    window.addEventListener('focus', fetchGroups);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', fetchGroups);
+    };
   }, []);
 
   return (

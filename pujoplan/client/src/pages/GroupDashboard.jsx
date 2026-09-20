@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../layouts/AppLayout';
 import PujaMap from '../components/PujaMap';
@@ -7,19 +7,87 @@ import GroupChat from '../components/GroupChat';
 import GmapsBottomSheet from '../components/GmapsBottomSheet';
 import DistanceChatbot from '../components/DistanceChatbot';
 import { solveNearestNeighbor, calculateLegDistances } from '../utils/routeOptimizer';
+import { DEFAULT_PANDALS } from '../data/defaultPandals';
 import {
   getGroupById, voteGroupSpot, removeGroupSpot,
   finalizeGroupSpot, generateGroupRoute,
-  removeMember, regenerateInvite, deleteGroup,
-  getGroupLocations, updateGroupLocation,
+  removeMember, leaveGroup, regenerateInvite, deleteGroup,
+  getGroupLocations, updateGroupLocation, deduplicateMembers,
 } from '../services/api';
+import { subscribeToGroupUpdates } from '../services/socket';
 import { getReliableCurrentLocation } from '../services/routingService';
 import {
   MapPin, Plus, ThumbsUp, Trash2, Copy, Share2,
   Check, Star, Route, Users, ChevronDown, ChevronUp, AlertTriangle,
-  MessageSquare, Navigation, ArrowLeft, EyeOff, Compass,
+  MessageSquare, Navigation, ArrowLeft, EyeOff, Compass, LogOut,
 } from 'lucide-react';
 import './GroupDashboard.css';
+
+function isGenericEmail(email) {
+  if (!email) return true;
+  const em = email.toLowerCase().trim();
+  return (
+    em.endsWith('@pujoplan.app') ||
+    em.endsWith('@pujoplan.dev') ||
+    em.endsWith('@demo.com') ||
+    em.includes('local-user')
+  );
+}
+
+function findMatchingPandal(targetId, targetName) {
+  if (!targetId && !targetName) return null;
+  const tid = String(targetId || '').toLowerCase().trim();
+  const tidNum = tid.replace(/[^0-9]/g, '');
+  const tname = String(targetName || '').toLowerCase().trim();
+
+  return DEFAULT_PANDALS.find((p) => {
+    const pid = String(p.id || '').toLowerCase().trim();
+    const pidNum = pid.replace(/[^0-9]/g, '');
+    const pname = String(p.name || '').toLowerCase().trim();
+
+    if (tid && (pid === tid || pid.replace(/[^a-z0-9]/g, '') === tid.replace(/[^a-z0-9]/g, ''))) return true;
+    if (tidNum && pidNum && parseInt(tidNum, 10) === parseInt(pidNum, 10)) return true;
+    if (tname && tname !== 'pandal spot' && (pname === tname || pname.includes(tname) || tname.includes(pname))) return true;
+    return false;
+  }) || null;
+}
+
+function normalizeGroup(rawGroup) {
+  if (!rawGroup) return null;
+  const rawSpots = Array.isArray(rawGroup.spots) ? rawGroup.spots : [];
+  const spots = rawSpots.map((s) => {
+    const spotId = s.spotId || s.spot?.id || s.id;
+    let spotObj = (s.spot && s.spot.name) ? { ...s.spot } : (s.spot || {});
+    if (!spotObj.name || !spotObj.latitude) {
+      const found = findMatchingPandal(spotId, spotObj?.name || s?.name);
+      if (found) {
+        spotObj = { ...found, ...spotObj };
+      }
+    }
+    return {
+      ...s,
+      id: s.id || `gs_${spotId}`,
+      spotId,
+      spot: spotObj,
+      status: s.status || 'suggested',
+      voteCount: s.voteCount || 0,
+      iVoted: Boolean(s.iVoted),
+      addedBy: s.addedBy || { name: 'Member' },
+    };
+  });
+
+  const rawMembers = Array.isArray(rawGroup.members) ? rawGroup.members : [];
+  return {
+    ...rawGroup,
+    name: rawGroup.name || 'Group Plan',
+    members: rawMembers,
+    spots,
+    _count: {
+      members: rawMembers.length,
+      spots: spots.length,
+    },
+  };
+}
 
 const CROWD_CLR = {
   'Very High': 'var(--red)',
@@ -118,55 +186,72 @@ const KNOWN_START_COORDS = {
   // Howrah & Outer Suburbs
   'amta': { lat: 22.57828, lng: 88.00922 },
   'amta station': { lat: 22.5744, lng: 88.0189 },
-  'bagnan': { lat: 22.4678, lng: 87.9708 },
-  'uluberia': { lat: 22.4744, lng: 88.1098 },
+  'bagnan': { lat: 22.4690, lng: 87.9710 },
+  'uluberia': { lat: 22.4744, lng: 88.1090 },
   'domjur': { lat: 22.6416, lng: 88.2235 },
   'andul': { lat: 22.5855, lng: 88.2435 },
   'dankuni': { lat: 22.6865, lng: 88.2936 },
-  'serampore': { lat: 22.7522, lng: 88.3433 },
-  'srirampur': { lat: 22.7522, lng: 88.3433 },
-  'rishra': { lat: 22.7126, lng: 88.3512 },
+  'kolaghat': { lat: 22.4330, lng: 87.8730 },
+  'panskura': { lat: 22.4200, lng: 87.7300 },
+  'tamluk': { lat: 22.3000, lng: 87.9200 },
+  'haldia': { lat: 22.0667, lng: 88.0667 },
+  'mecheda': { lat: 22.4300, lng: 87.8600 },
+  'kharagpur': { lat: 22.3300, lng: 87.3200 },
+  'midnapore': { lat: 22.4200, lng: 87.3200 },
+  'medinipur': { lat: 22.4200, lng: 87.3200 },
+  'serampore': { lat: 22.7500, lng: 88.3400 },
+  'shrirampur': { lat: 22.7500, lng: 88.3400 },
+  'rishra': { lat: 22.7100, lng: 88.3500 },
   'konnagar': { lat: 22.7000, lng: 88.3500 },
-  'uttarpara': { lat: 22.6685, lng: 88.3496 },
+  'uttarpara': { lat: 22.6700, lng: 88.3500 },
   'bally': { lat: 22.6500, lng: 88.3400 },
-  'chandannagar': { lat: 22.8671, lng: 88.3674 },
-  'chinsurah': { lat: 22.9011, lng: 88.3968 },
-  'hooghly': { lat: 22.9011, lng: 88.3968 },
-  'bandel': { lat: 22.9218, lng: 88.3756 },
+  'chandannagar': { lat: 22.8700, lng: 88.3700 },
+  'chinsurah': { lat: 22.9000, lng: 88.3900 },
+  'hooghly': { lat: 22.9000, lng: 88.3900 },
+  'bandel': { lat: 22.9200, lng: 88.3700 },
   'singur': { lat: 22.8100, lng: 88.2300 },
   'tarakeswar': { lat: 22.8872, lng: 88.0200 },
-  'barasat': { lat: 22.7214, lng: 88.4816 },
-  'madhyamgram': { lat: 22.6980, lng: 88.4550 },
+  'barasat': { lat: 22.7200, lng: 88.4800 },
+  'madhyamgram': { lat: 22.7000, lng: 88.4500 },
   'habra': { lat: 22.8362, lng: 88.6318 },
-  'barrackpore': { lat: 22.7644, lng: 88.3777 },
-  'naihati': { lat: 22.8988, lng: 88.4239 },
-  'sonarpur': { lat: 22.4388, lng: 88.4312 },
-  'baruipur': { lat: 22.3654, lng: 88.4325 },
-  'diamond harbour': { lat: 22.1906, lng: 88.1925 },
-  'canning': { lat: 22.3106, lng: 88.6575 },
-  'budge budge': { lat: 22.4822, lng: 88.1818 },
-  'maheshtala': { lat: 22.5078, lng: 88.2472 },
-  'kolaghat': { lat: 22.4300, lng: 87.8700 },
-  'mecheda': { lat: 22.4172, lng: 87.8732 },
-  'tamluk': { lat: 22.2989, lng: 87.9258 },
-  'kharagpur': { lat: 22.3302, lng: 87.3237 },
-  'midnapore': { lat: 22.4257, lng: 87.3199 },
-  'burdwan': { lat: 23.2324, lng: 87.8615 },
+  'barrackpore': { lat: 22.7600, lng: 88.3700 },
+  'sodepur': { lat: 22.7000, lng: 88.3900 },
+  'khardah': { lat: 22.7200, lng: 88.3800 },
+  'titagarh': { lat: 22.7400, lng: 88.3700 },
+  'naihati': { lat: 22.9000, lng: 88.4200 },
+  'bhatpara': { lat: 22.8700, lng: 88.4100 },
+  'kalyani': { lat: 22.9750, lng: 88.4344 },
+  'ranaghat': { lat: 23.1800, lng: 88.5800 },
+  'santipur': { lat: 23.2500, lng: 88.4300 },
+  'krishnanagar': { lat: 23.4000, lng: 88.5000 },
+  'sonarpur': { lat: 22.4400, lng: 88.4300 },
+  'baruipur': { lat: 22.3600, lng: 88.4300 },
+  'diamond harbour': { lat: 22.1900, lng: 88.2000 },
+  'canning': { lat: 22.3100, lng: 88.6600 },
+  'budge budge': { lat: 22.4800, lng: 88.1800 },
+  'maheshtala': { lat: 22.5100, lng: 88.2500 },
+  'durgapur': { lat: 23.5204, lng: 87.3119 },
+  'asansol': { lat: 23.6739, lng: 86.9524 },
+  'siliguri': { lat: 26.7271, lng: 88.3953 },
   'bardhaman': { lat: 23.2324, lng: 87.8615 },
+  'burdwan': { lat: 23.2324, lng: 87.8615 },
+  'malda': { lat: 25.0108, lng: 88.1411 },
+  'berhampore': { lat: 24.1000, lng: 88.2500 },
+  'baharampur': { lat: 24.1000, lng: 88.2500 },
+  'kolkata': { lat: 22.5726, lng: 88.3639 },
 };
 
-function getGroupStartCoords(startLoc) {
-  if (!startLoc || !startLoc.trim()) return { lat: 22.5726, lng: 88.3639 };
-  const query = startLoc.toLowerCase().trim();
+function getGroupStartCoords(locName) {
+  if (!locName || typeof locName !== 'string') return { lat: 22.5726, lng: 88.3639 };
+  const clean = locName.trim().toLowerCase();
+  if (KNOWN_START_COORDS[clean]) return KNOWN_START_COORDS[clean];
+
   for (const [key, coords] of Object.entries(KNOWN_START_COORDS)) {
-    if (query.includes(key) || key.includes(query)) {
-      return coords;
-    }
+    if (clean.includes(key) || key.includes(clean)) return coords;
   }
   return { lat: 22.5726, lng: 88.3639 };
 }
 
-// Asynchronous geocoder for custom addresses with Nominatim fallback
 async function geocodeCustomLocation(startLoc) {
   if (!startLoc || !startLoc.trim()) return { lat: 22.5726, lng: 88.3639 };
   const quick = getGroupStartCoords(startLoc);
@@ -194,7 +279,7 @@ async function geocodeCustomLocation(startLoc) {
         return { lat: parseFloat(broadData[0].lat), lng: parseFloat(broadData[0].lon) };
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   return quick;
 }
 
@@ -202,17 +287,53 @@ export default function GroupDashboard() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('plan'); // 'plan' | 'route' | 'ai' | 'chat'
+
+  const searchParams = new URLSearchParams(location.search);
+  const initialTab = searchParams.get('tab') || (searchParams.get('call') ? 'chat' : 'plan');
+  const [activeTab, setActiveTab] = useState(initialTab); // 'plan' | 'route' | 'ai' | 'chat'
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('tab') === 'chat' || params.get('call')) {
+      setActiveTab('chat');
+    }
+  }, [location.search]);
   const [routeData, setRouteData] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [copied, setCopied] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+
+  // Live location & navigation states
+  const [locations, setLocations] = useState([]);
+  const [isSharing, setIsSharing] = useState(false);
+  const [sharingLoading, setSharingLoading] = useState(false);
+  const [centerTarget, setCenterTarget] = useState(null);
+  const [myLocation, setMyLocation] = useState(null); // { latitude, longitude, accuracy }
+  const [waypoints, setWaypoints] = useState([]);
+  const [startFromMe, setStartFromMe] = useState(false); // Default: use group startLocation
+  const [toastMessage, setToastMessage] = useState('');
+  const [visitedStops, setVisitedStops] = useState(new Set()); // Set of waypoint indices (1-based for stops)
+  const mapComponentRef = useRef(null);
+
+  // Toggle visited status for a pandal stop by index
+  const handleMarkVisited = useCallback((index) => {
+    setVisitedStops((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }, []);
 
   // Invalidate map bounds on tab switch to route
   useEffect(() => {
@@ -224,32 +345,187 @@ export default function GroupDashboard() {
     }
   }, [activeTab]);
 
-  // Live location & navigation states
-  const [locations, setLocations] = useState([]);
-  const [isSharing, setIsSharing] = useState(false);
-  const [sharingLoading, setSharingLoading] = useState(false);
-  const [centerTarget, setCenterTarget] = useState(null);
-  const [myLocation, setMyLocation] = useState(null); // { latitude, longitude, accuracy }
-  const [waypoints, setWaypoints] = useState([]);
-  const [startFromMe, setStartFromMe] = useState(false); // Default: use group startLocation
-  const [toastMessage, setToastMessage] = useState('');
-  const mapComponentRef = useRef(null);
+  const requestGpsLocation = useCallback(() => {
+    if (!navigator?.geolocation) return;
 
-  const isAdmin = group?.myRole === 'admin';
+    const onPos = (pos) => {
+      setMyLocation({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy || 30,
+      });
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      onPos,
+      () => {
+        navigator.geolocation.getCurrentPosition(onPos, () => { }, {
+          enableHighAccuracy: false,
+          timeout: 12000,
+          maximumAge: 60000,
+        });
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  }, []);
+
+  // Auto-read GPS when mounted or when Route tab opens
+  useEffect(() => {
+    requestGpsLocation();
+  }, [requestGpsLocation, activeTab]);
+
+  // Passive watchPosition while Route tab is open — keeps the blue dot and red tracker live
+  useEffect(() => {
+    if (!navigator?.geolocation) return;
+
+    let watchId = null;
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setMyLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy || 30,
+          });
+        },
+        () => { }, // Silently ignore errors
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+      );
+    } catch (_) { }
+
+    return () => {
+      if (watchId !== null && navigator?.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const currentUserId = user?.id || user?.uid || user?.firebaseUid;
+  const currentUserEmail = (user?.email || '').toLowerCase().trim();
+  const isAdmin =
+    group?.myRole === 'admin' ||
+    group?.adminId === currentUserId ||
+    group?.admin?.id === currentUserId ||
+    (currentUserEmail && !isGenericEmail(group?.admin?.email) && group?.admin?.email?.toLowerCase().trim() === currentUserEmail) ||
+    (group?.members || []).some(
+      (m) =>
+        (m.userId === currentUserId ||
+          m.user?.id === currentUserId ||
+          (currentUserEmail && !isGenericEmail(m.user?.email) && m.user?.email?.toLowerCase().trim() === currentUserEmail)) &&
+        m.role === 'admin'
+    );
   const inviteUrl = group ? `${window.location.origin}/join/${group.inviteToken}` : '';
+  const inviteCode = group?.inviteToken || '';
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isSilent = false) => {
     try {
       const { data } = await getGroupById(id);
-      setGroup(data);
+      setGroup(normalizeGroup(data));
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to load group.');
+      if (!isSilent) {
+        setError(e.response?.data?.error || 'Failed to load group.');
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const grpInterval = setInterval(() => {
+      load(true);
+    }, 4000);
+
+    // 1. Realtime Socket.io listener (instant MongoDB Atlas updates over WebSocket)
+    const unsubSocket = subscribeToGroupUpdates(id, {
+      onMemberJoined: ({ member, group: updatedGroup }) => {
+        if (updatedGroup) {
+          setGroup(normalizeGroup(updatedGroup));
+        } else if (member) {
+          setGroup((prev) => {
+            if (!prev) return prev;
+            const currentMembers = prev.members || [];
+            if (currentMembers.some((m) => m.userId === member.userId || m.id === member.id)) {
+              return prev;
+            }
+            const newMembers = [...currentMembers, member];
+            return normalizeGroup({
+              ...prev,
+              members: newMembers,
+            });
+          });
+        }
+      },
+      onMemberLeft: ({ memberId, userId, targetUserId, group: updatedGroup }) => {
+        const removedIds = [memberId, userId, targetUserId].filter(Boolean);
+        const currentUserId = user?.id || user?.firebaseUid;
+        const currentUserEmail = (user?.email || '').toLowerCase().trim();
+
+        const isMeRemoved = removedIds.some(
+          (rid) =>
+            rid === currentUserId ||
+            rid === user?.id ||
+            rid === user?.firebaseUid ||
+            (currentUserEmail && typeof rid === 'string' && rid.toLowerCase() === currentUserEmail)
+        ) || (updatedGroup && !updatedGroup.memberUids?.includes(currentUserId) && updatedGroup.adminId !== currentUserId);
+
+        if (isMeRemoved) {
+          try {
+            localStorage.removeItem(`pp_shared_group_${id}`);
+            const remaining = (JSON.parse(localStorage.getItem('pp_local_groups') || '[]')).filter(g => g.id !== id);
+            localStorage.setItem('pp_local_groups', JSON.stringify(remaining));
+          } catch (_) { }
+
+          navigate('/groups', { replace: true });
+          return;
+        }
+
+        if (updatedGroup) {
+          setGroup(normalizeGroup(updatedGroup));
+        } else if (removedIds.length > 0) {
+          setGroup((prev) => {
+            if (!prev) return prev;
+            const newMembers = (prev.members || []).filter(
+              (m) => !removedIds.includes(m.id) && !removedIds.includes(m.userId) && !removedIds.includes(m.user?.id)
+            );
+            return normalizeGroup({
+              ...prev,
+              members: newMembers,
+            });
+          });
+        }
+      },
+      onSpotsUpdated: ({ spots, group: updatedGroup }) => {
+        if (updatedGroup) {
+          setGroup(normalizeGroup(updatedGroup));
+        } else if (spots) {
+          setGroup((prev) => normalizeGroup({
+            ...prev,
+            spots,
+          }));
+        }
+      },
+      onLocationUpdated: (loc) => {
+        if (loc && loc.userId) {
+          setLocations((prev) => {
+            const next = prev.filter((l) => l.userId !== loc.userId);
+            next.push(loc);
+            return next;
+          });
+        }
+      },
+      onGroupDeleted: () => {
+        navigate('/groups');
+      },
+    });
+
+    return () => {
+      clearInterval(grpInterval);
+      unsubSocket();
+    };
+  }, [load, id, navigate]);
 
   // Order pandals using nearest-neighbor greedy algorithm starting from designated plan start location
   useEffect(() => {
@@ -278,15 +554,23 @@ export default function GroupDashboard() {
       };
 
       const spotWps = (group.spots || [])
-        .filter((s) => s.spot && s.spot.latitude && s.spot.longitude)
-        .map((s, idx) => ({
-          id: s.id || `spot-${idx}`,
-          groupSpotId: s.id,
-          spotId: s.spotId || s.spot?.id,
-          name: s.spot.name,
-          lat: Number(s.spot.latitude),
-          lng: Number(s.spot.longitude),
-        }));
+        .map((s, idx) => {
+          const targetId = s.spotId || s.spot?.id || s.id;
+          const matched = (!s?.spot || !s.spot.latitude || !s.spot.name)
+            ? findMatchingPandal(targetId, s?.spot?.name || s?.name)
+            : null;
+          const sp = { ...(matched || {}), ...(s?.spot || {}) };
+          if (!sp.latitude || !sp.longitude) return null;
+          return {
+            id: s.id || `spot-${idx}`,
+            groupSpotId: s.id,
+            spotId: targetId,
+            name: sp.name || `Pandal ${idx + 1}`,
+            lat: Number(sp.latitude),
+            lng: Number(sp.longitude),
+          };
+        })
+        .filter(Boolean);
 
       if (spotWps.length > 0) {
         const optimized = solveNearestNeighbor(startWp, spotWps);
@@ -349,7 +633,7 @@ export default function GroupDashboard() {
                 latitude: loc.latitude,
                 longitude: loc.longitude,
                 isSharingLocation: true,
-              }).catch(() => {});
+              }).catch(() => { });
             }
           },
           (err) => {
@@ -357,7 +641,7 @@ export default function GroupDashboard() {
           },
           { enableHighAccuracy: false, maximumAge: 10000, timeout: 8000 }
         );
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Periodic heartbeat sync every 10s to keep sharing alive on server
@@ -370,7 +654,7 @@ export default function GroupDashboard() {
             latitude: myLocation.latitude,
             longitude: myLocation.longitude,
             isSharingLocation: true,
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
     }, 10000);
@@ -580,14 +864,19 @@ export default function GroupDashboard() {
   }
 
   function copyInvite() {
-    navigator.clipboard.writeText(inviteUrl);
+    const codeToCopy = group?.inviteToken || inviteCode;
+    navigator.clipboard.writeText(codeToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
   function shareInvite() {
+    const codeToShare = group?.inviteToken || inviteCode;
     if (navigator.share) {
-      navigator.share({ title: `Join ${group.name}`, url: inviteUrl }).catch(() => { });
+      navigator.share({
+        title: `Join ${group.name} on PujoPlan`,
+        text: `Join my Durga Puja group "${group.name}"! Enter this code in PujoPlan:\n\n${codeToShare}`,
+      }).catch(() => { });
     } else {
       copyInvite();
     }
@@ -601,19 +890,54 @@ export default function GroupDashboard() {
     } catch (_) { }
   }
 
-  async function handleRemoveMember(userId) {
-    if (!window.confirm('Remove this member?')) return;
+  async function handleRemoveMember(memberId, memberUserId) {
+    const targetId = memberId || memberUserId;
+    if (!targetId) return;
     try {
-      await removeMember(id, userId);
-      setGroup(p => ({ ...p, members: p.members.filter(m => m.user.id !== userId) }));
-    } catch (e) { alert(e.response?.data?.error || 'Failed.'); }
+      await removeMember(id, targetId);
+      setGroup(p => {
+        if (!p || !p.members) return p;
+        return {
+          ...p,
+          members: p.members.filter(m => m.id !== targetId && m.userId !== targetId && m.user?.id !== targetId)
+        };
+      });
+      setLocations(p => p.filter(l => l.id !== targetId && l.userId !== targetId));
+      setToastMessage('Member removed successfully');
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to remove member.');
+    }
+  }
+
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  async function handleLeaveGroup() {
+    try {
+      await leaveGroup(id);
+      navigate('/groups', { replace: true });
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to leave group.');
+    }
   }
 
   async function handleDeleteGroup() {
     try {
       await deleteGroup(id);
-      navigate('/dashboard', { replace: true });
-    } catch (e) { alert(e.response?.data?.error || 'Failed to delete.'); }
+      try {
+        localStorage.removeItem(`pp_shared_group_${id}`);
+        const localGroups = (JSON.parse(localStorage.getItem('pp_local_groups') || '[]')).filter(g => g.id !== id);
+        localStorage.setItem('pp_local_groups', JSON.stringify(localGroups));
+        if (currentUserId) {
+          const uKey = `pp_local_groups_${currentUserId}`;
+          const uGroups = (JSON.parse(localStorage.getItem(uKey) || '[]')).filter(g => g.id !== id);
+          localStorage.setItem(uKey, JSON.stringify(uGroups));
+        }
+      } catch (_) {}
+
+      navigate('/groups', { replace: true });
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to delete group.');
+    }
   }
 
   if (loading) return <AppLayout back onBack={() => navigate('/groups')}><div className="center-flex"><div className="spinner" /></div></AppLayout>;
@@ -628,8 +952,8 @@ export default function GroupDashboard() {
     </AppLayout>
   );
 
-  const finalizedSpots = group.spots.filter(s => s.status === 'finalized');
-  const suggestedSpots = group.spots
+  const finalizedSpots = (group?.spots || []).filter(s => s.status === 'finalized');
+  const suggestedSpots = (group?.spots || [])
     .filter(s => s.status !== 'finalized')
     .sort((a, b) => b.voteCount - a.voteCount);
 
@@ -637,7 +961,7 @@ export default function GroupDashboard() {
   const activeSharingCount = activeMembers.length;
 
   return (
-    <AppLayout title={group.name} back onBack={() => navigate('/groups')}>
+    <AppLayout title={group?.name || 'Group Plan'} back onBack={() => navigate('/groups')}>
       <div className="page-wrap gd">
         <button className="back-nav-btn" onClick={() => navigate('/groups')}>
           <ArrowLeft size={16} /> Back to Group Plans
@@ -645,12 +969,12 @@ export default function GroupDashboard() {
 
         {/* Meta */}
         <div className="gd__meta">
-          <span>{group.members.length} members</span>
+          <span>{(group?.members || []).length} members</span>
           <span>·</span>
-          <span>{group.spots.length} spots</span>
-          {group.visitDate && <><span>·</span><span>{group.visitDate}</span></>}
+          <span>{(group?.spots || []).length} spots</span>
+          {group?.visitDate && <><span>·</span><span>{group.visitDate}</span></>}
           <span className={`badge badge-${isAdmin ? 'yellow' : 'gray'}`} style={{ marginLeft: 'auto' }}>
-            {group.myRole}
+            {group?.myRole || 'member'}
           </span>
         </div>
 
@@ -693,21 +1017,21 @@ export default function GroupDashboard() {
         {/* ── 1. Plan Tab (Pandal Selection & Management) ── */}
         {activeTab === 'plan' && (
           <div className="gd__tab-pane">
-            {/* Invite strip */}
+            {/* Invite Code strip */}
             <div className="gd__invite">
               <div className="gd__invite-text">
-                <span className="gd__invite-label">Invite Link</span>
-                <span className="gd__invite-url">{inviteUrl}</span>
+                <span className="gd__invite-label">Invite Code</span>
+                <span className="gd__invite-code">{inviteCode}</span>
               </div>
               <button className="btn btn-yellow btn-sm" onClick={copyInvite}>
                 {copied ? <Check size={13} /> : <Copy size={13} />}
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? 'Copied!' : 'Copy'}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={shareInvite} style={{ padding: '8px 8px' }}>
                 <Share2 size={15} />
               </button>
               {isAdmin && (
-                <button className="btn btn-ghost btn-sm" onClick={handleRegenInvite} title="Regenerate" style={{ padding: '8px 8px' }}>
+                <button className="btn btn-ghost btn-sm" onClick={handleRegenInvite} title="Regenerate code" style={{ padding: '8px 8px' }}>
                   ↻
                 </button>
               )}
@@ -720,7 +1044,7 @@ export default function GroupDashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Users size={15} />
                 <span className="section-title" style={{ marginBottom: 0 }}>
-                  MEMBERS ({group.members.length})
+                  MEMBERS ({group.members?.length || 0})
                 </span>
               </div>
               {showMembers ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -728,26 +1052,38 @@ export default function GroupDashboard() {
 
             {showMembers && (
               <div className="gd__members">
-                {group.members.map(m => (
-                  <div key={m.id} className="gd__member">
-                    {m.user.profileImage
-                      ? <img src={m.user.profileImage} alt="" className="gd__member-avatar" referrerPolicy="no-referrer" />
-                      : <div className="gd__member-avatar gd__member-avatar--ph">{m.user.name[0]}</div>
-                    }
-                    <div className="gd__member-info">
-                      <span className="gd__member-name">{m.user.name}</span>
-                      <span className={`badge badge-${m.role === 'admin' ? 'yellow' : 'gray'}`} style={{ fontSize: '.6rem' }}>
-                        {m.role === 'admin' ? '👑 Admin' : 'Member'}
-                      </span>
+                {(group.members || []).map((m, idx) => {
+                  const memberId = m.id || `mem-${idx}`;
+                  const memberUserId = m.userId || m.user?.id;
+                  const isMemberAdmin = m.role === 'admin' || m.userId === group.adminId || m.user?.id === group.adminId || (!isGenericEmail(group.admin?.email) && m.user?.email === group.admin?.email);
+                  const isCurrentAdminRow = isMemberAdmin;
+
+                  return (
+                    <div key={memberId || memberUserId || idx} className="gd__member">
+                      {m.user?.profileImage
+                        ? <img src={m.user.profileImage} alt="" className="gd__member-avatar" referrerPolicy="no-referrer" />
+                        : <div className="gd__member-avatar gd__member-avatar--ph">{m.user?.name?.[0] || 'U'}</div>
+                      }
+                      <div className="gd__member-info">
+                        <span className="gd__member-name">{m.user?.name || 'Member'}</span>
+                        <span className={`badge badge-${isMemberAdmin ? 'yellow' : 'gray'}`} style={{ fontSize: '.6rem' }}>
+                          {isMemberAdmin ? '👑 Admin' : 'Member'}
+                        </span>
+                      </div>
+                      {isAdmin && !isCurrentAdminRow && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: '6px', cursor: 'pointer' }}
+                          title="Remove member"
+                          onClick={() => handleRemoveMember(memberId, memberUserId)}
+                        >
+                          <Trash2 size={13} color="var(--red)" />
+                        </button>
+                      )}
                     </div>
-                    {isAdmin && m.user.id !== user.id && (
-                      <button className="btn btn-ghost btn-sm" style={{ padding: '6px' }}
-                        onClick={() => handleRemoveMember(m.user.id)}>
-                        <Trash2 size={13} color="var(--red)" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -799,7 +1135,7 @@ export default function GroupDashboard() {
               </div>
             )}
 
-            {/* Admin danger zone */}
+            {/* Admin danger zone: Delete Group */}
             {isAdmin && (
               <>
                 <div className="divider" />
@@ -808,7 +1144,7 @@ export default function GroupDashboard() {
                   {confirmDel ? (
                     <div className="gd__confirm">
                       <AlertTriangle size={16} color="var(--red)" />
-                      <span>This cannot be undone.</span>
+                      <span>This will permanently delete the group.</span>
                       <button className="btn btn-red btn-sm" onClick={handleDeleteGroup}>Delete</button>
                       <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDel(false)}>Cancel</button>
                     </div>
@@ -817,6 +1153,33 @@ export default function GroupDashboard() {
                       style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
                       onClick={() => setConfirmDel(true)}>
                       <Trash2 size={13} /> Delete Group
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Member option: Leave Group */}
+            {!isAdmin && (
+              <>
+                <div className="divider" />
+                <div className="gd__danger">
+                  <p className="section-title" style={{ color: 'var(--red)', marginBottom: 8 }}>LEAVE GROUP</p>
+                  {confirmLeave ? (
+                    <div className="gd__confirm">
+                      <AlertTriangle size={16} color="var(--red)" />
+                      <span>Are you sure you want to leave this group?</span>
+                      <button className="btn btn-red btn-sm" onClick={handleLeaveGroup}>Yes, Leave</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setConfirmLeave(false)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ borderColor: 'rgba(234,67,53,0.5)', color: 'var(--red)' }}
+                      onClick={() => setConfirmLeave(true)}
+                    >
+                      <LogOut size={13} /> Leave Group
                     </button>
                   )}
                 </div>
@@ -843,6 +1206,43 @@ export default function GroupDashboard() {
               </button>
             </div>
 
+            {/* Map Legend */}
+            <div style={{ display: 'flex', gap: 16, margin: '8px 0', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 28, height: 4, background: '#EA4335', borderRadius: 4, flexShrink: 0 }} />
+                <span style={{ fontSize: '.72rem', color: 'var(--gray-light)' }}>You → Start point</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 28, height: 4, background: '#4285F4', borderRadius: 4, flexShrink: 0 }} />
+                <span style={{ fontSize: '.72rem', color: 'var(--gray-light)' }}>Pandal route (nearest-neighbor)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 10, height: 10, background: '#4285F4', borderRadius: '50%', border: '2px solid #fff', boxShadow: '0 0 4px #4285F4', flexShrink: 0 }} />
+                <span style={{ fontSize: '.72rem', color: 'var(--gray-light)' }}>Your Location</span>
+              </div>
+              {!myLocation?.latitude && (
+                <button
+                  type="button"
+                  onClick={requestGpsLocation}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    color: '#8ab4f8',
+                    background: 'rgba(66,133,244,0.12)',
+                    border: '1px solid rgba(66,133,244,0.3)',
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    fontSize: '.72rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Navigation size={12} />
+                  Enable GPS Location
+                </button>
+              )}
+            </div>
+
             {routeError && <div className="alert alert-error" style={{ marginBottom: 12 }}>{routeError}</div>}
 
             <div className="gmaps-integrated-wrapper" style={{ position: 'relative', marginTop: 12, borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -856,6 +1256,8 @@ export default function GroupDashboard() {
                 centerTarget={centerTarget}
                 onRouteSummary={handleRouteSummary}
                 onError={(msg) => setToastMessage(msg)}
+                visitedStops={visitedStops}
+                onMarkVisited={handleMarkVisited}
                 height={460}
               />
 
@@ -882,6 +1284,8 @@ export default function GroupDashboard() {
                 onFocusMember={(coords) => setCenterTarget(coords)}
                 toastMessage={toastMessage}
                 onCloseToast={() => setToastMessage('')}
+                visitedStops={visitedStops}
+                onMarkVisited={handleMarkVisited}
               />
             </div>
           </div>
@@ -912,34 +1316,40 @@ export default function GroupDashboard() {
 }
 
 function SpotRow({ gs, isAdmin, uid, onVote, onRemove, onFinalize }) {
-  const crowdClr = CROWD_CLR[gs.spot.crowdLevel] || 'var(--gray-light)';
-  const isOwner = gs.addedBy?.id === uid;
+  const targetSpotId = gs?.spotId || gs?.id;
+  const matched = (!gs?.spot || !gs.spot.name) ? findMatchingPandal(targetSpotId, gs?.name) : null;
+  const spot = { ...(matched || {}), ...(gs?.spot || {}) };
+  const spotName = spot.name || gs?.name || matched?.name || 'Durga Puja Pandal';
+  const spotArea = spot.area || gs?.area || matched?.area || 'Kolkata';
+  const crowdLevel = spot.crowdLevel || gs?.crowdLevel || matched?.crowdLevel || 'Moderate';
+  const crowdClr = CROWD_CLR[crowdLevel] || 'var(--gray-light)';
+  const addedByName = gs?.addedBy?.name || 'Member';
 
   return (
-    <div className={`gd__spot ${gs.status === 'finalized' ? 'gd__spot--fin' : ''}`}>
+    <div className={`gd__spot ${gs?.status === 'finalized' ? 'gd__spot--fin' : ''}`}>
       <div className="gd__spot-info">
-        <span className="gd__spot-name">{gs.spot.name}</span>
+        <span className="gd__spot-name">{spotName}</span>
         <div className="gd__spot-meta">
-          <MapPin size={10} /> {gs.spot.area}
-          <span style={{ color: crowdClr }}>● {gs.spot.crowdLevel}</span>
+          <MapPin size={10} /> {spotArea}
+          <span style={{ color: crowdClr }}>● {crowdLevel}</span>
         </div>
-        <span className="gd__spot-by">by {gs.addedBy?.name}</span>
+        <span className="gd__spot-by">by {addedByName}</span>
       </div>
 
       <div className="gd__spot-actions">
         <button
-          className={`gd__vote ${gs.iVoted ? 'gd__vote--on' : ''}`}
-          onClick={() => onVote(gs.spotId)}
+          className={`gd__vote ${gs?.iVoted ? 'gd__vote--on' : ''}`}
+          onClick={() => onVote(targetSpotId)}
         >
-          <ThumbsUp size={13} /> {gs.voteCount}
+          <ThumbsUp size={13} /> {gs?.voteCount || 0}
         </button>
 
         {isAdmin && (
           <button
-            className={`btn btn-sm ${gs.status === 'finalized' ? 'btn-yellow' : 'btn-outline'}`}
+            className={`btn btn-sm ${gs?.status === 'finalized' ? 'btn-yellow' : 'btn-outline'}`}
             style={{ padding: '6px 8px' }}
-            onClick={() => onFinalize(gs.spotId)}
-            title={gs.status === 'finalized' ? 'Unfinalize' : 'Finalize'}
+            onClick={() => onFinalize(targetSpotId)}
+            title={gs?.status === 'finalized' ? 'Unfinalize' : 'Finalize'}
           >
             <Star size={13} />
           </button>
@@ -949,9 +1359,9 @@ function SpotRow({ gs, isAdmin, uid, onVote, onRemove, onFinalize }) {
           type="button"
           className="btn btn-ghost btn-sm"
           style={{ padding: '6px 8px' }}
-          onClick={() => onRemove(gs.spotId || gs.id)}
-          title={`Remove ${gs.spot.name}`}
-          aria-label={`Remove ${gs.spot.name}`}
+          onClick={() => onRemove(targetSpotId)}
+          title={`Remove ${spotName}`}
+          aria-label={`Remove ${spotName}`}
         >
           <Trash2 size={13} color="var(--red)" />
         </button>

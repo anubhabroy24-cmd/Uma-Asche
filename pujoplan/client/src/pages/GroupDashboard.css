@@ -103,10 +103,12 @@
   color: var(--gray-mid);
 }
 
-.gd__invite-url {
-  font-size: .7rem;
+.gd__invite-code {
+  font-size: .95rem;
   color: var(--yellow);
-  font-family: monospace;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 800;
+  letter-spacing: .06em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

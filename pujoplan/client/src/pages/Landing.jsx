@@ -9,14 +9,6 @@ export default function Landing({ showButton = true }) {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [localErr, setLocalErr] = useState('');
-  const [buttonReady, setButtonReady] = useState(false);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setButtonReady(true);
-    }, 2000); // 2 seconds splash delay
-    return () => clearTimeout(timer);
-  }, []);
 
   async function handleLogin() {
     setLocalErr(''); setError(null);
@@ -65,7 +57,7 @@ export default function Landing({ showButton = true }) {
           </div>
         )}
 
-        {showButton && buttonReady && (
+        {showButton && (
           <div className="landing__cta-wrap">
             <button
               className="landing__btn"
@@ -81,7 +73,7 @@ export default function Landing({ showButton = true }) {
             </button>
 
             <p className="landing__tos">
-              By continuing you agree to our Terms of Service
+              Powered by Anubhab
             </p>
           </div>
         )}

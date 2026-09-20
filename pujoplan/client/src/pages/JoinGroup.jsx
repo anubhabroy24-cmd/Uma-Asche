@@ -31,9 +31,10 @@ export default function JoinGroup() {
     setError('');
     try {
       const { data } = await joinGroup(token);
-      navigate(`/group/${data.groupId}`, { replace: true });
+      const targetId = data?.groupId || data?.id || info?.groupId;
+      navigate(`/group/${targetId}`, { replace: true });
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to join. Try again.');
+      setError(e.response?.data?.error || e.message || 'Failed to join. Try again.');
       setJoining(false);
     }
   }

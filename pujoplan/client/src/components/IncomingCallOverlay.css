@@ -1,0 +1,210 @@
+/* WhatsApp-like incoming call screen overlay */
+.incoming-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(10, 10, 14, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: incFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes incFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.incoming-call-card {
+  width: 100%;
+  max-width: 380px;
+  background: #16171d;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.incoming-call-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 179, 0, 0.15);
+  color: #ffc107;
+  border: 1px solid rgba(255, 179, 0, 0.3);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+/* Pulsing Avatar */
+.incoming-call-avatar-wrap {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.incoming-call-ripple {
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 2px solid rgba(37, 211, 102, 0.5);
+  animation: incRipple 2s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.incoming-call-ripple--2 {
+  animation-delay: 0.65s;
+}
+
+@keyframes incRipple {
+  0% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.incoming-call-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #25d366;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.incoming-call-avatar-ph {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9900, #ea4335);
+  color: #ffffff;
+  font-size: 2.2rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #25d366;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.incoming-call-name {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.incoming-call-group {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffc107;
+  margin: 0 0 4px;
+}
+
+.incoming-call-status {
+  font-size: 0.82rem;
+  color: #9b9da4;
+  margin: 0 0 32px;
+  animation: incBlink 1.4s infinite alternate;
+}
+
+@keyframes incBlink {
+  0%   { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Action buttons */
+.incoming-call-actions {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 12px;
+}
+
+.incoming-call-btn-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.incoming-call-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.incoming-call-btn:active {
+  transform: scale(0.92);
+}
+
+.incoming-call-btn--decline {
+  background: #ea4335;
+  color: #ffffff;
+}
+
+.incoming-call-btn--decline:hover {
+  filter: brightness(1.1);
+}
+
+.incoming-call-btn--accept {
+  background: #25d366;
+  color: #ffffff;
+  animation: incPulseBtn 1.6s infinite ease-in-out;
+}
+
+.incoming-call-btn--accept:hover {
+  filter: brightness(1.1);
+}
+
+@keyframes incPulseBtn {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 14px rgba(37, 211, 102, 0);
+  }
+}
+
+.incoming-call-btn-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #c8c9ce;
+  letter-spacing: 0.02em;
+}

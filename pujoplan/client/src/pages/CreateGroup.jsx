@@ -2,19 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
 import { createGroup } from '../services/api';
-import { Copy, Check, Share2 } from 'lucide-react';
 import { PUJA_DATES } from '../config/pujaDates';
 import './CreateGroup.css';
 
 export default function CreateGroup() {
   const navigate = useNavigate();
   const [form,    setForm]    = useState({ name: '', visitDate: '', startLocation: '' });
-  const [group,   setGroup]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
-  const [copied,  setCopied]  = useState(false);
-
-  const inviteUrl = group ? `${window.location.origin}/join/${group.inviteToken}` : '';
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -25,68 +20,13 @@ export default function CreateGroup() {
     setLoading(true);
     try {
       const { data } = await createGroup(form);
-      setGroup(data);
+      if (data && data.id) {
+        navigate(`/group/${data.id}`, { replace: true });
+      }
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to create group.');
-    } finally {
       setLoading(false);
     }
-  }
-
-  function copyLink() {
-    navigator.clipboard.writeText(inviteUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-  }
-
-  function shareLink() {
-    if (navigator.share) {
-      navigator.share({
-        title: `Join ${group.name} on PujoPlan`,
-        text: `Plan Durga Puja 2026 together!`,
-        url: inviteUrl,
-      }).catch(() => {});
-    } else {
-      copyLink();
-    }
-  }
-
-  /* ── Success screen ── */
-  if (group) {
-    return (
-      <AppLayout title="Group Created" back onBack={() => navigate('/dashboard')}>
-        <div className="page-wrap cg-success">
-          <div className="cg-success__emoji">🎉</div>
-          <h2 className="cg-success__name">{group.name}</h2>
-
-          <div className="cg-invite">
-            <p className="section-title">INVITE LINK</p>
-            <div className="cg-invite__box">
-              <span className="cg-invite__url">{inviteUrl}</span>
-            </div>
-            <div className="cg-invite__btns">
-              <button className="btn btn-yellow btn-full" onClick={copyLink}>
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? 'Copied!' : 'Copy Link'}
-              </button>
-              <button className="btn btn-outline" onClick={shareLink} style={{ flex: '0 0 auto' }}>
-                <Share2 size={16} />
-              </button>
-            </div>
-          </div>
-
-          <div className="cg-success__actions">
-            <button className="btn btn-yellow btn-full" onClick={() => navigate(`/group/${group.id}`)}>
-              Open Group Dashboard
-            </button>
-            <button className="btn btn-ghost btn-full" onClick={() => navigate('/dashboard')}>
-              Back to Home
-            </button>
-          </div>
-        </div>
-      </AppLayout>
-    );
   }
 
   /* ── Create form ── */

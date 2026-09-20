@@ -54,8 +54,10 @@ export default function SpotExplorer({ mode }) {
     return () => clearTimeout(debRef.current);
   }, [fetchSpots]);
 
-  async function handleToggle(spotId) {
-    if (addingId === spotId) return;
+  async function handleToggle(spot) {
+    const spotId = typeof spot === 'object' && spot ? spot.id : spot;
+    const spotObj = typeof spot === 'object' && spot ? spot : spots.find(s => s.id === spotId);
+    if (!spotId || addingId === spotId) return;
     setAddingId(spotId);
     try {
       if (addedIds.has(spotId)) {
@@ -67,8 +69,8 @@ export default function SpotExplorer({ mode }) {
           return next;
         });
       } else {
-        if (mode === 'group') await addGroupSpot(id, spotId);
-        else                  await addSoloPlanSpot(id, spotId);
+        if (mode === 'group') await addGroupSpot(id, spotId, spotObj);
+        else                  await addSoloPlanSpot(id, spotId, spotObj);
         setAddedIds(prev => new Set([...prev, spotId]));
       }
     } catch (e) {
@@ -191,7 +193,7 @@ function SpotCard({ spot, added, adding, error, onToggle }) {
         ) : added ? (
           <button
             className="se__added"
-            onClick={() => onToggle(spot.id)}
+            onClick={() => onToggle(spot)}
             title="Remove from plan"
             aria-label={`Remove ${spot.name} from plan`}
           >
@@ -201,7 +203,7 @@ function SpotCard({ spot, added, adding, error, onToggle }) {
           <button
             className="btn btn-yellow btn-sm"
             style={{ padding: '7px 12px' }}
-            onClick={() => onToggle(spot.id)}
+            onClick={() => onToggle(spot)}
             disabled={adding}
           >
             {adding

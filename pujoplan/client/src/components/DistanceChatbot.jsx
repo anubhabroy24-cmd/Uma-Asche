@@ -121,7 +121,7 @@ export default function DistanceChatbot({
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
-    // 1. Instant 0ms Math Refusal
+    // 1. Instant 0ms Filter for Image Gen / School Homework / Research Papers
     if (isMathOrSyllabus(text)) {
       setMessages((prev) => [
         ...prev,
@@ -129,7 +129,7 @@ export default function DistanceChatbot({
           id: 'bot-' + Date.now(),
           sender: 'bot',
           type: 'text',
-          reply: '🙏 শুভ শারদীয়া! I only assist with Kolkata Durga Puja plans, pandal distances, transit routes, and public amenities. I do not solve math, syllabus, or academic questions.',
+          reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Guide Assistant. I cannot create images, solve school homework, or write academic research papers. Feel free to ask me anything about pandals, routes, food, metro, places to visit, and festive guides in any language!',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);

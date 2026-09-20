@@ -10,7 +10,14 @@ export default function JoinByCode() {
 
   function handleSubmit(event) {
     event.preventDefault();
-    const value = code.trim();
+    let value = code.trim();
+    if (!value) return;
+
+    // Handle case where user pasted full URL (e.g. http://localhost:5173/join/PJ_xyz or https://pujoplan.app/join/ABCDEF)
+    if (value.includes('/join/')) {
+      value = value.split('/join/')[1].split('?')[0].split('#')[0].trim();
+    }
+
     if (value) navigate(`/join/${encodeURIComponent(value)}`);
   }
 

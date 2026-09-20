@@ -729,6 +729,79 @@
   color: #ea4335;
 }
 
+/* ── Visited Stop Styles ─────────────────────────── */
+.gmaps-stop-row--visited {
+  background: rgba(52, 168, 83, 0.07);
+  border-color: rgba(52, 168, 83, 0.28);
+  opacity: 0.82;
+}
+
+.gmaps-stop-badge--visited {
+  background: #34a853;
+  font-size: 1rem;
+}
+
+.gmaps-stop-name--visited {
+  text-decoration: line-through;
+  color: #9aa0a6 !important;
+  opacity: 0.8;
+}
+
+.gmaps-visited-toggle-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid rgba(52, 168, 83, 0.5);
+  background: rgba(52, 168, 83, 0.1);
+  color: #34a853;
+  font-size: 1rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 1;
+}
+
+.gmaps-visited-toggle-btn:hover {
+  background: #34a853;
+  border-color: #34a853;
+  color: #fff;
+  transform: scale(1.12);
+}
+
+.gmaps-visited-toggle-btn--done {
+  background: rgba(95, 99, 104, 0.2);
+  border-color: rgba(95, 99, 104, 0.4);
+  color: #9aa0a6;
+  font-size: 0.85rem;
+}
+
+.gmaps-visited-toggle-btn--done:hover {
+  background: #5f6368;
+  border-color: #5f6368;
+  color: #fff;
+}
+
+.gmaps-visited-count-tag {
+  color: #34a853;
+  font-weight: 700;
+}
+
+/* Visited teardrop pin bounce animation */
+.gmaps-teardrop-pin--visited {
+  animation: gmapsVisitedBounce 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes gmapsVisitedBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.3) translateY(-4px); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
 /* ── Group Members Section ───────────────────────── */
 .gmaps-members-section {
   display: flex;
