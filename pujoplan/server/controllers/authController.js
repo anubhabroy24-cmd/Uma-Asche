@@ -1,6 +1,12 @@
-const prisma = require('../config/prisma');
+const User = require('../models/User');
 const { verifyIdToken } = require('../config/firebase');
-const { signToken } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'pujoplan_jwt_super_secret_2026_kolkata_durga_puja';
+
+function signToken(uid) {
+  return jwt.sign({ uid, user_id: uid }, JWT_SECRET, { expiresIn: '30d' });
+}
 
 /**
  * POST /api/auth/session
@@ -25,29 +31,31 @@ async function createSession(req, res, next) {
 
     const { uid, name, email, picture } = decoded;
     const finalName = (name && name !== 'User') ? name : (email ? email.split('@')[0] : 'Pujo Explorer');
+    const finalEmail = email || `${uid}@pujoplan.app`;
 
-    // Upsert user in our DB
-    const user = await prisma.user.upsert({
-      where: { firebaseUid: uid },
-      update: {
-        ...(finalName ? { name: finalName } : {}),
-        email: email || `${uid}@unknown.local`,
-        profileImage: picture || null,
-      },
-      create: {
-        firebaseUid: uid,
+    // Upsert user in MongoDB Atlas
+    let user = await User.findOne({ uid });
+    if (!user) {
+      user = await User.create({
+        uid,
         name: finalName,
-        email: email || `${uid}@unknown.local`,
+        email: finalEmail,
         profileImage: picture || null,
-      },
-    });
+      });
+    } else {
+      if (finalName && (!user.name || user.name === 'Explorer' || user.name === 'User')) user.name = finalName;
+      if (picture && !user.profileImage) user.profileImage = picture;
+      if (finalEmail && !user.email) user.email = finalEmail;
+      await user.save().catch(() => {});
+    }
 
-    const token = signToken(user.id);
+    const token = signToken(user.uid);
 
     return res.json({
       token,
       user: {
-        id: user.id,
+        id: user.uid,
+        uid: user.uid,
         name: user.name,
         email: user.email,
         profileImage: user.profileImage,
@@ -59,4 +67,4 @@ async function createSession(req, res, next) {
   }
 }
 
-module.exports = { createSession };
+module.exports = { createSession, signToken };
