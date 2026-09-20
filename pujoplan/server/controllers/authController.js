@@ -24,18 +24,19 @@ async function createSession(req, res, next) {
     }
 
     const { uid, name, email, picture } = decoded;
+    const finalName = (name && name !== 'User') ? name : (email ? email.split('@')[0] : 'Pujo Explorer');
 
     // Upsert user in our DB
     const user = await prisma.user.upsert({
       where: { firebaseUid: uid },
       update: {
-        name: name || email?.split('@')[0] || 'User',
+        ...(finalName ? { name: finalName } : {}),
         email: email || `${uid}@unknown.local`,
         profileImage: picture || null,
       },
       create: {
         firebaseUid: uid,
-        name: name || email?.split('@')[0] || 'User',
+        name: finalName,
         email: email || `${uid}@unknown.local`,
         profileImage: picture || null,
       },

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const ctrl = require('../controllers/groupController');
+const callCtrl = require('../controllers/callController');
 
 // Invite info — must be before /:id routes
 router.get('/invite-info/:token', ctrl.getInviteInfo);
@@ -19,6 +20,7 @@ router.post('/:id/invite', requireAuth, ctrl.regenerateInvite);
 // Members
 router.get('/:id/members', requireAuth, ctrl.getMembers);
 router.delete('/:id/members/:userId', requireAuth, ctrl.removeMember);
+router.post('/:id/leave', requireAuth, ctrl.leaveGroup);
 
 // Spots
 router.post('/:id/spots', requireAuth, ctrl.addSpot);
@@ -37,5 +39,10 @@ router.post('/:id/messages', requireAuth, ctrl.sendGroupMessage);
 router.get('/:id/locations', requireAuth, ctrl.getGroupLocations);
 router.post('/:id/location', requireAuth, ctrl.updateMemberLocation);
 
+// Voice & Video Call (Stream Calling)
+router.post('/:id/call/signal', requireAuth, callCtrl.handleCallSignal);
+router.get('/:id/call/status', requireAuth, callCtrl.getCallStatus);
+
 module.exports = router;
+
 

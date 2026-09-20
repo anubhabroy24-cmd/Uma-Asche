@@ -73,13 +73,18 @@ async function verifyIdToken(idToken) {
     if (parts.length === 3) {
       const payloadRaw = Buffer.from(parts[1], 'base64').toString('utf-8');
       const payload = JSON.parse(payloadRaw);
-      const uid = payload.user_id || payload.sub || payload.uid;
+      const uid = payload.user_id || payload.sub || payload.uid || payload.id || payload.userId;
       if (uid) {
+        const extractedName =
+          payload.name ||
+          payload.displayName ||
+          (payload.email ? payload.email.split('@')[0] : 'Pujo Explorer');
+
         return {
           uid,
-          name: payload.name || payload.email?.split('@')[0] || 'User',
+          name: extractedName,
           email: payload.email || `${uid}@pujoplan.app`,
-          picture: payload.picture || null,
+          picture: payload.picture || payload.avatar_url || null,
         };
       }
     }

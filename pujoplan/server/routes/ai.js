@@ -3,7 +3,8 @@ const router = express.Router();
 
 // High-speed, high-quota models in priority order
 const GEMINI_MODELS = [
-  'gemini-3.1-flash-lite', // Fastest & highest free quota (~1.5s)
+  'gemini-3.5-flash-lite', // Fastest & highest active quota (~1s)
+  'gemini-3.1-flash-lite',
   'gemini-3.6-flash',
   'gemini-flash-latest'
 ];
@@ -22,14 +23,24 @@ function normalizeKey(str) {
 }
 
 /**
- * Instant local detector for math, homework, or academic syllabus queries (0ms)
+ * Filter out image creation requests, school/college homework/syllabus studies, and academic research papers.
  */
-function isMathOrAcademic(query = '') {
+function isDisallowedQuery(query = '') {
   const q = query.trim().toLowerCase();
-  if (/\b(solve|equation|derivative|integral|algebra|calculus|pythagoras|formula|fraction)\b/i.test(q)) return true;
+
+  // 1. Image generation
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic)\b/i.test(q)) return true;
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|imagine\s+a)\b/i.test(q)) return true;
+
+  // 2. Pure academic homework, school/college syllabus & coding homework
+  if (/\b(solve|equation|derivative|integral|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) return true;
   if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) return true;
-  if (/\b(what is|calculate)\s*\d+/i.test(q)) return true;
-  if (/\b(syllabus|homework|exam|physics|chemistry|biology|photosynthesis|mitochondria|newton|essay|definition of|write a program|code)\b/i.test(q)) return true;
+  if (/\b(what is|calculate)\s*\d+\s*[\+\-\*\/]/i.test(q)) return true;
+  if (/\b(syllabus|homework|school assignment|exam question|chapter\s*\d|physics numerical|chemistry lab|mitochondria|photosynthesis|newton's\s*law|write a program|write python code|write c\+\+|write java code)\b/i.test(q)) return true;
+
+  // 3. Academic research papers, thesis
+  if (/\b(research paper|academic thesis|dissertation|literature review|scholarly citation|peer-reviewed journal)\b/i.test(q)) return true;
+
   return false;
 }
 
@@ -80,7 +91,7 @@ const PREWARMED_RESPONSES = [
 ];
 
 /**
- * High-speed system instructions
+ * High-speed system instructions with unrestricted language support
  */
 function buildSystemInstruction(context = {}) {
   const { groupName, startLocation, groupSpots = [] } = context;
@@ -89,13 +100,19 @@ function buildSystemInstruction(context = {}) {
     ? groupSpots.slice(0, 8).map((s, i) => `${i + 1}. ${s.name || s.spot?.name || 'Pandal'}`).join(', ')
     : 'None';
 
-  return `You are the intelligent Durga Puja 2026 AI Assistant for Kolkata.
-DOMAIN & FORMAT RULES:
-1. Help with Kolkata Durga Puja 2026, pandals, routes, travel distances, metro, public washrooms, and food & nightlife amenities (restaurants, street food, bars & pubs near landmarks).
-2. STRICT REFUSAL: Refuse math, school syllabus, academic questions with: "🙏 শুভ শারদীয়া! I only assist with Kolkata Durga Puja plans, pandal distances, transit routes, and public amenities."
-3. AMENITIES (BARS/RESTAURANTS/WASHROOMS): When asked for bars, pubs, or restaurants near an area (e.g. Maidan, Park Street, Salt Lake), suggest the most famous nearby spots and always include a direct clickable Google Maps search link: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata)
-4. TRANSIT & DISTANCES: Give exact road km, metro connection (Blue Line or underwater Green Line), and driving/walking estimates with: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<ORIGIN>&destination=<DESTINATION>)
-5. Context: Plan "${groupName || 'Pandal Hopper'}", Start "${startLocation || 'Kolkata Central'}", Stops: ${spotNames}. Keep answers helpful, fast, and structured with bullet points.`;
+  return `You are Uma Asche AI — the intelligent, friendly, and comprehensive Kolkata Durga Puja & General Assistant.
+
+CORE GUIDELINES:
+1. UNIVERSAL CONVERSATION & MULTILINGUAL:
+   - Answer ANY question the user asks (festivals, travel, food, culture, history, tips, advice, greetings, general inquiries).
+   - Freely converse in ANY language: Bengali (বাংলা), English, Hindi (हिंदी), Banglish/Hinglish, or any other language requested. Always reply naturally in the language the user speaks.
+2. REFUSALS / LIMITATIONS:
+   - Image & Video Creation: If the user asks you to generate, draw, render, or create images/videos, politely explain: "🙏 I am a text chat assistant and cannot generate or render images/videos."
+   - School Homework / Academic Research: If asked to write school syllabus homework or academic research papers/theses, politely decline and offer to help with travel, puja, food, culture, and general guidance instead.
+3. GOOGLE MAPS LINKS:
+   - For travel routes: Include [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<ORIGIN>&destination=<DESTINATION>)
+   - For amenities (food, washrooms, restaurants, bars): Include [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata)
+4. USER PLAN CONTEXT: Plan "${groupName || 'Pandal Hopper'}", Starting Point "${startLocation || 'Kolkata Central'}", Stops: ${spotNames}. Keep replies clear, well-formatted, and helpful.`;
 }
 
 /**
@@ -110,10 +127,10 @@ router.post('/chat', async (req, res, next) => {
       return res.status(400).json({ error: 'Query or message is required.' });
     }
 
-    // 1. Instant 0ms Math Refusal
-    if (isMathOrAcademic(userQuery)) {
+    // 1. Instant 0ms Filter for Image Gen / School Homework / Research Papers
+    if (isDisallowedQuery(userQuery)) {
       return res.json({
-        reply: '🙏 শুভ শারদীয়া! I only assist with Kolkata Durga Puja plans, pandal distances, transit routes, and public amenities. I do not solve math, syllabus, or academic questions.',
+        reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Travel Assistant. I cannot generate images, solve school/college homework, or write academic research papers. Feel free to ask me anything about pandals, routes, food, metro, places to visit, and festive guides in any language!',
         gmapsUrl: null,
         modelUsed: 'instant-rule',
         source: 'gemini',

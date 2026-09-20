@@ -1,0 +1,262 @@
+const { StreamClient } = require('@stream-io/node-sdk');
+const { emitGroupUpdate } = require('../services/socketService');
+const Call = require('../models/Call');
+const Group = require('../models/Group');
+
+const STREAM_API_KEY = process.env.STREAM_API_KEY || 'bazavn2fpwsf';
+const STREAM_API_SECRET = process.env.STREAM_API_SECRET || 'y5wbvp69z4m25cvbyz2zvyc3wtjxp3rgya5w5j46k62xds58y3q5u5sbqsz4cqpy';
+
+let streamClientInstance = null;
+function getStreamClient() {
+  if (!streamClientInstance) {
+    streamClientInstance = new StreamClient(STREAM_API_KEY, STREAM_API_SECRET);
+  }
+  return streamClientInstance;
+}
+
+/**
+ * POST /api/calls/token or /api/calls/stream-token
+ * Generate short-lived Stream Video token for authenticated user and initialize call
+ */
+async function generateStreamToken(req, res, next) {
+  try {
+    const user = req.user || {};
+    let { groupId, callId } = req.body;
+
+    const rawUid = user.id || user.uid || user._id || 'user_' + Date.now();
+    // Stream user IDs must only contain alphanumeric, underscore, or hyphen characters
+    const userId = String(rawUid).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const userName = user.name || 'Group Member';
+    const userImage = user.profileImage || undefined;
+
+    const client = getStreamClient();
+
+    // Upsert user on Stream
+    await client.upsertUsers([
+      {
+        id: userId,
+        name: userName,
+        image: userImage,
+        role: 'user',
+      },
+    ]).catch((e) => {
+      console.warn('[Stream] upsertUsers warning:', e.message);
+    });
+
+    // Generate user token (valid for 24 hours)
+    const token = client.generateUserToken({ user_id: userId });
+
+    // Derive Stream call ID from groupId or callId
+    const targetCallId = String(callId || (groupId ? `group_${groupId}` : 'pujo_call_' + Date.now()))
+      .replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // Pre-create or get call on Stream
+    try {
+      const call = client.video.call('default', targetCallId);
+      await call.getOrCreate({
+        data: {
+          created_by_id: userId,
+          custom: {
+            groupId: groupId || '',
+          },
+        },
+      });
+    } catch (e) {
+      console.warn('[Stream] call.getOrCreate warning:', e.message);
+    }
+
+    return res.json({
+      token,
+      apiKey: STREAM_API_KEY,
+      userId,
+      userName,
+      userImage,
+      callId: targetCallId,
+      callType: 'default',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/calls/status or /api/groups/:id/call/status
+ */
+async function getCallStatus(req, res, next) {
+  try {
+    const groupId = req.params.id || req.query.groupId;
+    if (!groupId) return res.json({ active: false, call: null });
+
+    const call = await Call.findOne({ groupId, status: { $ne: 'ended' } });
+    return res.json({
+      active: !!call && call.status !== 'ended',
+      callMode: call?.type || 'video',
+      startedBy: call?.caller || null,
+      startedAt: call?.createdAt ? new Date(call.createdAt).getTime() : Date.now(),
+      participants: (call?.candidates || []).map(c => ({
+        id: c.userId || c.id,
+        name: c.name || 'Member',
+        profileImage: c.profileImage || null,
+      })),
+      call: call || null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/calls/signal or /api/groups/:id/call/signal
+ * Socket.io + Database call state signaling
+ */
+async function handleCallSignal(req, res, next) {
+  try {
+    const groupId = req.params.id || req.body.groupId;
+    const { type, channelName, callId, callMode = 'video', targetUserId, status } = req.body;
+    const user = req.user || {};
+
+    const callerObj = {
+      id: user.id || user.uid,
+      name: user.name || 'Group Member',
+      profileImage: user.profileImage || null,
+    };
+
+    const targetCallId = callId || channelName || `group_${groupId}`;
+
+    if (type === 'start' || type === 'startCall' || type === 'call_started') {
+      let call = await Call.findOne({ groupId });
+      if (!call) {
+        call = new Call({
+          groupId,
+          type: callMode,
+          status: 'ringing',
+          caller: callerObj,
+          candidates: [callerObj],
+        });
+      } else {
+        call.status = 'ringing';
+        call.type = callMode;
+        call.caller = callerObj;
+        call.candidates = [callerObj];
+      }
+      await call.save();
+
+      emitGroupUpdate(groupId, 'incomingCall', {
+        groupId,
+        callId: targetCallId,
+        channelName: targetCallId,
+        callMode,
+        caller: callerObj,
+        targetUserId: targetUserId || 'all',
+      });
+
+      emitGroupUpdate(groupId, 'call_signal', {
+        groupId,
+        type: 'start',
+        callId: targetCallId,
+        channelName: targetCallId,
+        callMode,
+        caller: callerObj,
+        status: 'ringing',
+      });
+    } else if (type === 'accept' || type === 'acceptCall') {
+      const call = await Call.findOne({ groupId });
+      if (call) {
+        call.status = 'active';
+        if (!call.candidates.some(c => c.id === callerObj.id)) {
+          call.candidates.push(callerObj);
+        }
+        await call.save();
+      }
+
+      emitGroupUpdate(groupId, 'callAccepted', {
+        groupId,
+        callId: targetCallId,
+        channelName: targetCallId,
+        callee: callerObj,
+      });
+
+      emitGroupUpdate(groupId, 'call_signal', {
+        groupId,
+        type: 'accept',
+        callId: targetCallId,
+        channelName: targetCallId,
+        callee: callerObj,
+        status: 'active',
+      });
+    } else if (type === 'decline' || type === 'declineCall') {
+      emitGroupUpdate(groupId, 'callDeclined', {
+        groupId,
+        callId: targetCallId,
+        channelName: targetCallId,
+        callee: callerObj,
+        reason: req.body.reason || 'declined',
+      });
+
+      emitGroupUpdate(groupId, 'call_signal', {
+        groupId,
+        type: 'decline',
+        callId: targetCallId,
+        channelName: targetCallId,
+        status: 'declined',
+      });
+    } else if (type === 'leave') {
+      const call = await Call.findOne({ groupId });
+      if (call) {
+        call.candidates = (call.candidates || []).filter(c => (c.id || c.userId) !== callerObj.id);
+        if (call.candidates.length === 0) {
+          call.status = 'ended';
+        }
+        await call.save();
+      }
+
+      emitGroupUpdate(groupId, 'call_signal', {
+        groupId,
+        type: 'user_left',
+        callId: targetCallId,
+        channelName: targetCallId,
+        userId: callerObj.id,
+      });
+
+      if (!call || (call.candidates && call.candidates.length === 0)) {
+        emitGroupUpdate(groupId, 'callEnded', {
+          groupId,
+          callId: targetCallId,
+          channelName: targetCallId,
+          senderId: callerObj.id,
+        });
+      }
+    } else if (type === 'end' || type === 'endCall') {
+      await Call.findOneAndUpdate(
+        { groupId },
+        { status: 'ended', candidates: [] }
+      );
+
+      emitGroupUpdate(groupId, 'callEnded', {
+        groupId,
+        callId: targetCallId,
+        channelName: targetCallId,
+        senderId: callerObj.id,
+      });
+
+      emitGroupUpdate(groupId, 'call_signal', {
+        groupId,
+        type: 'ended',
+        callId: targetCallId,
+        channelName: targetCallId,
+        status: 'ended',
+      });
+    }
+
+    return res.json({ success: true, callId: targetCallId });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  generateStreamToken,
+  generateAgoraToken: generateStreamToken, // alias for backward-compatibility
+  getCallStatus,
+  handleCallSignal,
+};

@@ -61,7 +61,8 @@ model GroupMessage {
   id        String   @id @default(cuid())
   groupId   String
   userId    String
-  text      String
+  text      String   @default("")
+  imageUrl  String?
   createdAt DateTime @default(now())
 
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
