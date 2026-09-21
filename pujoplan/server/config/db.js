@@ -9,10 +9,10 @@ async function connectDB() {
   const candidates = [
     process.env.MONGODB_URI,
     process.env.MONGODB_DIRECT_URI,
-    'mongodb://localhost:27017/pujoplan',
+    ...(process.env.NODE_ENV === 'production' ? [] : ['mongodb://localhost:27017/pujoplan']),
   ].filter(Boolean);
 
-  let lastError = null;
+  const errors = [];
 
   for (const uri of candidates) {
     try {
@@ -30,15 +30,15 @@ async function connectDB() {
       );
       return;
     } catch (err) {
-      lastError = err;
       const safeUri = uri.replace(/:\/\/([^:]+):([^@]+)@/, '://$1:***@');
+      errors.push({ uri: safeUri, message: err.message });
       console.warn(`[MongoDB] ⚠️ Failed to connect to ${safeUri}: ${err.message}`);
     }
   }
 
   console.error('[MongoDB] ❌ All MongoDB connections failed.');
-  console.error('[MongoDB] Last error:', lastError?.message || 'Unknown error');
-  console.warn('[MongoDB] Please verify MONGODB_URI in server/.env or start a local MongoDB instance.');
+  errors.forEach(({ uri, message }) => console.error(`[MongoDB] ${uri}: ${message}`));
+  console.warn('[MongoDB] Set MONGODB_URI and MONGODB_DIRECT_URI in the Render environment.');
 }
 
 module.exports = { connectDB };
