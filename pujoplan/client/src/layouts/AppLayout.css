@@ -47,6 +47,7 @@
 
 .app-header__left  { display: flex; align-items: center; }
 .app-header__center { display: flex; align-items: center; justify-content: center; }
+.app-header__right { display: flex; align-items: center; justify-content: flex-end; }
 .app-header__logo {
   font-size: 1.05rem;
   font-weight: 900;
