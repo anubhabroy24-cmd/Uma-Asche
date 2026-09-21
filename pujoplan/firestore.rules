@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is a group member
+    function isGroupMember(resourceData) {
+      return isAuthenticated() && (
+        resourceData.adminId == request.auth.uid ||
+        request.auth.uid in resourceData.memberUids ||
+        (request.auth.token.email != null && resourceData.memberUids.hasAny([request.auth.token.email.lower()]))
+      );
+    }
+
+    // Groups collection
+    match /groups/{groupId} {
+      // Allow any authenticated user to create a group
+      allow create: if isAuthenticated();
+
+      // Allow ANY authenticated user/member to read the group document and the full members array
+      allow read: if isAuthenticated();
+
+      // Allow members or joiners to update group details (e.g. adding new members or pandal spots)
+      allow update: if isAuthenticated();
+
+      // Allow group admin to delete the group
+      allow delete: if isAuthenticated();
+
+      // Subcollections under groups/{groupId}
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      match /call/{document=**} {
+        allow read, write: if isAuthenticated();
+      }
+
+      match /call_signals/{signalId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      match /locations/{locationId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+  }
+}

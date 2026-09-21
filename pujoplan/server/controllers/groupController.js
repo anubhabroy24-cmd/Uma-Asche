@@ -2,9 +2,9 @@ const Group = require('../models/Group');
 const Message = require('../models/Message');
 const Call = require('../models/Call');
 const Presence = require('../models/Presence');
-const prisma = require('../config/prisma');
 const { emitGroupUpdate } = require('../services/socketService');
 const { nanoid } = require('nanoid');
+
 
 // Helper to generate portable or standard invite tokens
 function generateInviteToken(groupId, name, adminId) {

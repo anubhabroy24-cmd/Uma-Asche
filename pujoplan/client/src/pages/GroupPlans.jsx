@@ -1,40 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import AppLayout from '../layouts/AppLayout';
-import { getMyGroups } from '../services/api';
+import { getMyGroups, getLocalGroups } from '../services/api';
 import { Users, Plus, ChevronRight, KeyRound, Calendar, ArrowLeft } from 'lucide-react';
 import './GroupPlans.css';
 
 export default function GroupPlans() {
   const navigate = useNavigate();
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  
+  // Instant initial load from local cache
+  const [groups, setGroups] = useState(() => getLocalGroups());
+  const [loading, setLoading] = useState(() => getLocalGroups().length === 0);
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
-    const fetchGroups = () => {
-      getMyGroups()
-        .then(r => {
-          if (isMounted) setGroups(Array.isArray(r.data) ? r.data : []);
-        })
-        .catch(() => {
-          if (isMounted) setGroups([]);
-        })
-        .finally(() => {
-          if (isMounted) setLoading(false);
-        });
+    
+    // Check local groups immediately
+    const cached = getLocalGroups();
+    if (cached.length > 0) {
+      setGroups(cached);
+      setLoading(false);
+    }
+
+    // Safety timeout: Never keep spinner active for more than 2 seconds
+    const timer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 2000);
+
+    // Load fresh groups from MongoDB backend in background
+    const fetchGroups = async () => {
+      try {
+        const res = await getMyGroups();
+        if (isMounted && res?.data) {
+          setGroups(res.data);
+        }
+      } catch (err) {
+        console.warn('[GroupPlans] Backend fetch error:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
     };
 
     fetchGroups();
-    const interval = setInterval(fetchGroups, 3000);
-    window.addEventListener('focus', fetchGroups);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
-      window.removeEventListener('focus', fetchGroups);
+      clearTimeout(timer);
     };
-  }, []);
+  }, [user]);
 
   return (
     <AppLayout title="Group Plans" back onBack={() => navigate('/dashboard')}>
@@ -81,34 +101,38 @@ export default function GroupPlans() {
           <div className="gp__list">
             {groups.map(g => (
               <div
-                key={g.id}
+                key={g.id || g._id}
                 className="plan-card plan-card--red"
-                onClick={() => navigate(`/group/${g.id}`)}
+                onClick={() => navigate(`/group/${g.id || g._id}`)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && navigate(`/group/${g.id}`)}
+                onKeyDown={e => e.key === 'Enter' && navigate(`/group/${g.id || g._id}`)}
               >
                 <div className="plan-card__icon">
                   <Users size={18} />
                 </div>
                 <div className="plan-card__body">
-                  <div className="plan-card__row">
-                    <span className="plan-card__title">{g.name}</span>
-                    {g.myRole && (
-                      <span className={`badge badge-${g.myRole === 'admin' ? 'yellow' : 'gray'}`}>
-                        {g.myRole}
+                  <span className="plan-card__title">{g.name}</span>
+                  <div className="plan-card__meta">
+                    {g.visitDate && (
+                      <span className="plan-card__meta-item">
+                        <Calendar size={11} /> {g.visitDate}
                       </span>
                     )}
-                  </div>
-                  <div className="plan-card__meta">
-                    <span>{g._count?.members ?? 0} members</span>
-                    <span>· {g._count?.spots ?? 0} spots</span>
-                    {g.visitDate && (
-                      <span>· <Calendar size={10} style={{ display: 'inline' }} /> {g.visitDate}</span>
-                    )}
+                    <span className="plan-card__meta-item">
+                      <Users size={11} /> {g._count?.members ?? g.members?.length ?? 1} members
+                    </span>
+                    <span className="plan-card__meta-item">
+                      {g._count?.spots ?? g.spots?.length ?? 0} pandals
+                    </span>
                   </div>
                 </div>
-                <ChevronRight size={18} className="plan-card__arrow" />
+                <div className="plan-card__badges">
+                  <span className={`badge ${g.myRole === 'admin' ? 'badge-yellow' : 'badge-gray'}`}>
+                    {g.myRole === 'admin' ? 'Admin' : 'Member'}
+                  </span>
+                  <ChevronRight size={14} color="var(--text-muted)" />
+                </div>
               </div>
             ))}
           </div>

@@ -1,158 +1,139 @@
 import { io } from 'socket.io-client';
 
-export const PRODUCTION_SOCKET_URL = 'https://uma-asche.onrender.com';
-const BACKEND_URL = (import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace('/api', '')
-  : PRODUCTION_SOCKET_URL).replace(/\/+$/, '');
+// Derive Socket.io server URL from the API URL (strip /api suffix)
+const SOCKET_SERVER_URL = 'https://uma-asche.onrender.com';
 
 let socket = null;
-let currentGroupId = null;
-const allJoinedGroupIds = new Set();
+
+function getAuthToken() {
+  return localStorage.getItem('pp_token') || null;
+}
 
 export function getSocket() {
-  if (!socket) {
-    const token = localStorage.getItem('pp_token') || '';
-    socket = io(BACKEND_URL, {
-      auth: { token },
+  if (!socket || socket.disconnected) {
+    socket = io(SOCKET_SERVER_URL, {
       transports: ['websocket', 'polling'],
-      autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 15,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      auth: (cb) => {
+        // Send JWT token so server knows who the connecting user is
+        cb({ token: getAuthToken() });
+      },
     });
 
     socket.on('connect', () => {
-      console.log('[Socket] ⚡ Connected to PujoPlan backend:', socket.id);
-      if (allJoinedGroupIds.size > 0) {
-        socket.emit('join_groups', Array.from(allJoinedGroupIds));
-      } else if (currentGroupId) {
-        socket.emit('join_group', currentGroupId);
-      }
-    });
-
-    socket.on('connect_error', (err) => {
-      console.warn('[Socket] Connection error:', err.message);
+      console.log('[Socket.io] ✅ Connected:', socket.id);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
+      console.warn('[Socket.io] ⚠️ Disconnected:', reason);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('[Socket.io] Connection error:', err.message);
+    });
+
+    socket.on('reconnect', (attempt) => {
+      console.log('[Socket.io] 🔄 Reconnected after', attempt, 'attempts');
     });
   }
-
   return socket;
 }
 
-export function updateSocketAuthToken(token) {
-  if (socket) {
-    socket.auth = { token };
-    if (!socket.connected) {
-      socket.connect();
-    }
-  }
-}
+/**
+ * Subscribe to all real-time events for a specific group.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToGroupUpdates(groupId, handlers = {}) {
+  if (!groupId) return () => {};
 
-export function joinGroupRoom(groupId) {
-  if (!groupId) return;
-  currentGroupId = groupId;
-  allJoinedGroupIds.add(groupId);
   const s = getSocket();
-  if (s.connected) {
-    s.emit('join_group', groupId);
-  }
-}
 
-export function joinMultipleGroupRooms(groupIds) {
-  if (!Array.isArray(groupIds) || groupIds.length === 0) return;
-  groupIds.forEach(id => {
-    if (id) allJoinedGroupIds.add(id);
-  });
-  const s = getSocket();
-  if (s.connected) {
-    s.emit('join_groups', groupIds);
-  }
-}
+  // Join the group room on the server
+  s.emit('join_group', groupId);
+  console.log('[Socket.io] Joining group room:', groupId);
 
-export function leaveGroupRoom(groupId) {
-  if (currentGroupId === groupId) {
-    currentGroupId = null;
-  }
-  allJoinedGroupIds.delete(groupId);
-  const s = getSocket();
-  if (s.connected && groupId) {
+  const onMemberJoined = (data) => {
+    console.log('[Socket.io] member_joined:', data);
+    handlers.onMemberJoined?.(data);
+  };
+
+  const onMemberLeft = (data) => {
+    console.log('[Socket.io] member_left:', data);
+    handlers.onMemberLeft?.(data);
+  };
+
+  const onSpotsUpdated = (data) => {
+    console.log('[Socket.io] spots_updated:', data);
+    handlers.onSpotsUpdated?.(data);
+  };
+
+  const onLocationUpdated = (data) => {
+    handlers.onLocationUpdated?.(data);
+  };
+
+  const onGroupDeleted = (data) => {
+    console.log('[Socket.io] group_deleted:', data);
+    handlers.onGroupDeleted?.(data);
+  };
+
+  const onNewMessage = (data) => {
+    handlers.onNewMessage?.(data);
+  };
+
+  const onCallSignal = (data) => {
+    handlers.onCallSignal?.(data);
+  };
+
+  const onIncomingCall = (data) => {
+    handlers.onIncomingCall?.(data);
+  };
+
+  const onCallEnded = (data) => {
+    handlers.onCallEnded?.(data);
+  };
+
+  s.on('member_joined', onMemberJoined);
+  s.on('member_left', onMemberLeft);
+  s.on('spots_updated', onSpotsUpdated);
+  s.on('location_updated', onLocationUpdated);
+  s.on('group_deleted', onGroupDeleted);
+  s.on('new_message', onNewMessage);
+  s.on('call_signal', onCallSignal);
+  s.on('incomingCall', onIncomingCall);
+  s.on('callEnded', onCallEnded);
+
+  // Cleanup: unsubscribe and leave room
+  return () => {
     s.emit('leave_group', groupId);
-  }
-}
-
-export function subscribeToIncomingCalls(onIncomingCall, onCallEnded) {
-  const s = getSocket();
-
-  const handleIncoming = (data) => {
-    if (onIncomingCall && data) onIncomingCall(data);
-  };
-
-  const handleSignal = (data) => {
-    if (!data) return;
-    if (data.type === 'start' || data.status === 'ringing') {
-      if (onIncomingCall) onIncomingCall(data);
-    } else if (data.type === 'ended' || data.type === 'decline' || data.status === 'ended') {
-      if (onCallEnded) onCallEnded(data);
-    }
-  };
-
-  const handleEnded = (data) => {
-    if (onCallEnded && data) onCallEnded(data);
-  };
-
-  s.on('incomingCall', handleIncoming);
-  s.on('call_signal', handleSignal);
-  s.on('callEnded', handleEnded);
-
-  return () => {
-    s.off('incomingCall', handleIncoming);
-    s.off('call_signal', handleSignal);
-    s.off('callEnded', handleEnded);
+    s.off('member_joined', onMemberJoined);
+    s.off('member_left', onMemberLeft);
+    s.off('spots_updated', onSpotsUpdated);
+    s.off('location_updated', onLocationUpdated);
+    s.off('group_deleted', onGroupDeleted);
+    s.off('new_message', onNewMessage);
+    s.off('call_signal', onCallSignal);
+    s.off('incomingCall', onIncomingCall);
+    s.off('callEnded', onCallEnded);
   };
 }
 
-export function subscribeToGroupUpdates(groupId, {
-  onMemberJoined,
-  onMemberLeft,
-  onSpotsUpdated,
-  onNewMessage,
-  onLocationUpdated,
-  onCallSignal,
-  onGroupDeleted,
-} = {}) {
-  const s = getSocket();
-  joinGroupRoom(groupId);
-
-  const handleMemberJoined = (data) => onMemberJoined && onMemberJoined(data);
-  const handleMemberLeft = (data) => onMemberLeft && onMemberLeft(data);
-  const handleSpotsUpdated = (data) => onSpotsUpdated && onSpotsUpdated(data);
-  const handleNewMessage = (data) => onNewMessage && onNewMessage(data);
-  const handleLocationUpdated = (data) => onLocationUpdated && onLocationUpdated(data);
-  const handleCallSignal = (data) => onCallSignal && onCallSignal(data);
-  const handleGroupDeleted = (data) => onGroupDeleted && onGroupDeleted(data);
-
-  s.on('member_joined', handleMemberJoined);
-  s.on('member_left', handleMemberLeft);
-  s.on('spots_updated', handleSpotsUpdated);
-  s.on('new_message', handleNewMessage);
-  s.on('location_updated', handleLocationUpdated);
-  s.on('call_signal', handleCallSignal);
-  s.on('group_deleted', handleGroupDeleted);
-
-  return () => {
-    s.off('member_joined', handleMemberJoined);
-    s.off('member_left', handleMemberLeft);
-    s.off('spots_updated', handleSpotsUpdated);
-    s.off('new_message', handleNewMessage);
-    s.off('location_updated', handleLocationUpdated);
-    s.off('call_signal', handleCallSignal);
-    s.off('group_deleted', handleGroupDeleted);
-    // Note: Do not leave the server room here so user continues to receive
-    // incoming call alerts and chat push notifications across tabs/pages
-  };
+/**
+ * Keep-alive ping to prevent Render free-tier cold-starts.
+ * Call once at app startup.
+ */
+let keepAliveInterval = null;
+export function startKeepAlive() {
+  if (keepAliveInterval) return; // Only run once
+  // Ping every 14 minutes
+  keepAliveInterval = setInterval(() => {
+    fetch('https://uma-asche.onrender.com/api/health', { method: 'GET' })
+      .then(() => console.log('[KeepAlive] ✅ Server pinged'))
+      .catch(() => console.warn('[KeepAlive] Ping failed (server may be waking up)'));
+  }, 14 * 60 * 1000);
 }
 
-
+export default getSocket;

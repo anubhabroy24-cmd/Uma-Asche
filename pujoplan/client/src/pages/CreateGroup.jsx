@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import AppLayout from '../layouts/AppLayout';
 import { createGroup } from '../services/api';
 import { PUJA_DATES } from '../config/pujaDates';
@@ -7,9 +8,10 @@ import './CreateGroup.css';
 
 export default function CreateGroup() {
   const navigate = useNavigate();
-  const [form,    setForm]    = useState({ name: '', visitDate: '', startLocation: '' });
+  const { user } = useAuth();
+  const [form, setForm] = useState({ name: '', visitDate: '', startLocation: '' });
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
+  const [error, setError] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -17,14 +19,35 @@ export default function CreateGroup() {
     if (!form.name.trim()) return setError('Group name is required.');
     if (!form.visitDate) return setError('Please select a visit date.');
     if (!form.startLocation.trim()) return setError('Starting location is required.');
+    
+    if (!user) {
+      setError('You must be signed in to create a group.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data } = await createGroup(form);
-      if (data && data.id) {
-        navigate(`/group/${data.id}`, { replace: true });
+      const payload = {
+        name: form.name.trim(),
+        region: 'Kolkata',
+        visitDate: form.visitDate,
+        startLocation: form.startLocation.trim(),
+      };
+
+      console.log('[CreateGroup] Creating group with MongoDB API:', payload);
+      const res = await createGroup(payload);
+      const created = res.data;
+      
+      if (created && (created.id || created._id)) {
+        const targetId = created.id || created._id;
+        console.log('[CreateGroup] Group created successfully in MongoDB:', targetId);
+        navigate(`/group/${targetId}`, { replace: true });
+      } else {
+        throw new Error('Failed to create group');
       }
     } catch (e) {
-      setError(e.response?.data?.error || 'Failed to create group.');
+      console.error('[CreateGroup] Error:', e);
+      setError(e.response?.data?.error || e.message || 'Failed to create group. Please try again.');
       setLoading(false);
     }
   }

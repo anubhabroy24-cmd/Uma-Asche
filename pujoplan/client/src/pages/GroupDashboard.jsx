@@ -14,7 +14,6 @@ import {
   removeMember, leaveGroup, regenerateInvite, deleteGroup,
   getGroupLocations, updateGroupLocation, deduplicateMembers,
 } from '../services/api';
-import { subscribeToGroupUpdates } from '../services/socket';
 import { getReliableCurrentLocation } from '../services/routingService';
 import {
   MapPin, Plus, ThumbsUp, Trash2, Copy, Share2,
@@ -22,6 +21,10 @@ import {
   MessageSquare, Navigation, ArrowLeft, EyeOff, Compass, LogOut,
 } from 'lucide-react';
 import './GroupDashboard.css';
+import { subscribeToGroupUpdates, startKeepAlive } from '../services/socket';
+
+// Start keep-alive on first group view to prevent Render cold-starts
+startKeepAlive();
 
 function isGenericEmail(email) {
   if (!email) return true;
@@ -932,7 +935,7 @@ export default function GroupDashboard() {
           const uGroups = (JSON.parse(localStorage.getItem(uKey) || '[]')).filter(g => g.id !== id);
           localStorage.setItem(uKey, JSON.stringify(uGroups));
         }
-      } catch (_) {}
+      } catch (_) { }
 
       navigate('/groups', { replace: true });
     } catch (e) {

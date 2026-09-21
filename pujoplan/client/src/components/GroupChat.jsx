@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { getGroupMessages, sendGroupMessage, getCallStatus } from '../services/api';
-import { subscribeToGroupUpdates } from '../services/socket';
 import { showMobileNotification } from '../services/notificationService';
-import StreamCallModal from './StreamCallModal';
+import { subscribeToGroupUpdates } from '../services/socket';
 import {
   Send, MessageSquare, AlertCircle, Phone, PhoneOff,
   Mic, MicOff, Volume2, Users, Radio, Video, VideoOff,
@@ -22,6 +20,34 @@ function formatDuration(totalSeconds) {
   const s = totalSeconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
+
+// WebRTC ICE configuration with Google STUN + Open Relay Free TURN Servers for mobile data & strict NATs
+export const rtcConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelay',
+      credential: 'openrelay',
+    },
+    {
+      urls: [
+        'turns:openrelay.metered.ca:443?transport=tcp',
+      ],
+      username: 'openrelay',
+      credential: 'openrelay',
+    },
+  ],
+  iceCandidatePoolSize: 10,
+};
 
 // Helper to accurately detect if message was sent by the current active user
 function isMsgFromUser(msg, currentUser) {
@@ -199,57 +225,38 @@ export default function GroupChat({ groupId, currentUser }) {
     }
   }, [groupId, currentUser]);
 
-  // Initial fetch and Realtime messages subscription
+  // Initial fetch + real-time Socket.io subscription + slow fallback poll
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
 
-    // 1. Realtime Socket.io message listener (WebSocket push from backend)
+    // Real-time: listen for new messages via Socket.io (instant delivery)
     const unsubSocket = subscribeToGroupUpdates(groupId, {
-      onNewMessage: (newMsg) => {
-        if (newMsg && newMsg.id) {
-          // Persist into localStorage cache so it remains across navigation
-          try {
-            const raw = localStorage.getItem(`pp_messages_${groupId}`);
-            const list = raw ? JSON.parse(raw) : [];
-            if (!list.some(m => m.id === newMsg.id)) {
-              list.push(newMsg);
-              if (list.length > 500) list.shift();
-              localStorage.setItem(`pp_messages_${groupId}`, JSON.stringify(list));
-            }
-          } catch (_) { }
-
-          setMessages((prev) => {
-            // If already present, don't duplicate
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-
-            // If message is from current user, replace any matching pending temp message
-            if (isMsgFromUser(newMsg, currentUser)) {
-              const tempIdx = prev.findIndex(
-                (m) =>
-                  typeof m.id === 'string' &&
-                  m.id.startsWith('temp-') &&
-                  m.text === newMsg.text &&
-                  (m.imageUrl || null) === (newMsg.imageUrl || null)
-              );
-              if (tempIdx !== -1) {
-                const next = [...prev];
-                next[tempIdx] = newMsg;
-                return next;
-              }
-            }
-            return [...prev, newMsg];
-          });
-          setLoading(false);
-        }
+      onNewMessage: (msg) => {
+        if (!msg) return;
+        // Avoid duplicate if this was our own optimistic message
+        setMessages((prev) => {
+          const isDuplicate = prev.some(
+            (m) => m.id === msg.id || (m.id?.startsWith('temp-') && isMsgFromUser(m, currentUser) && m.text === msg.text)
+          );
+          if (isDuplicate) return prev;
+          // Remove any matching temp message for this content
+          const filtered = prev.filter(
+            (m) => !(m.id?.startsWith('temp-') && isMsgFromUser(m, currentUser) && m.text === msg.text)
+          );
+          return [...filtered, msg];
+        });
       },
     });
+
+    // Fallback: slower poll every 8s in case socket misses something
+    const interval = setInterval(fetchMessages, 8000);
 
     return () => {
       clearInterval(interval);
       unsubSocket();
     };
-  }, [fetchMessages, groupId, currentUser]);
+  }, [fetchMessages, groupId]);
+
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -261,7 +268,6 @@ export default function GroupChat({ groupId, currentUser }) {
     try {
       const { data } = await getCallStatus(groupId);
 
-      // Trigger notification if someone starts a voice/video call and we are not in it
       if (data && data.active && !prevCallActiveRef.current && !isInCall) {
         const callerName = data.startedBy?.name || 'A group member';
         const modeLabel = data.callMode === 'video' ? '📹 Video Call' : '📞 Voice Call';
@@ -287,36 +293,13 @@ export default function GroupChat({ groupId, currentUser }) {
     } catch (_) { }
   }, [groupId, isInCall]);
 
-  // ── Live Call State & Signals Subscription ──
+  // ── Live Call State Polling ──
   useEffect(() => {
     pollCallStatus();
     const interval = setInterval(pollCallStatus, 3000);
 
-    const handleSignal = (sig) => {
-      if (!sig || sig.from === currentUser?.id || sig.senderId === currentUser?.id || sig.caller?.id === currentUser?.id) return;
-      if ((sig.status === 'ringing' || sig.type === 'start' || sig.type === 'call_started') && !isInCall) {
-        setCallActive(true);
-        if (sig.callMode) setCallMode(sig.callMode);
-        if (sig.caller) setCallStartedBy(sig.caller);
-        try {
-          import('../services/ringtoneService').then(m => m.startRingtone());
-        } catch (_) { }
-      } else if (sig.status === 'ended' || sig.type === 'ended') {
-        setCallActive(false);
-        setCallParticipants([]);
-        try {
-          import('../services/ringtoneService').then(m => m.stopRingtone());
-        } catch (_) { }
-      }
-    };
-
-    const unsubSocket = subscribeToGroupUpdates(groupId, {
-      onCallSignal: handleSignal,
-    });
-
     return () => {
       clearInterval(interval);
-      unsubSocket();
       try {
         import('../services/ringtoneService').then(m => m.stopRingtone());
       } catch (_) { }

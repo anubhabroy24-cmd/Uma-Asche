@@ -41,6 +41,8 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 const ALLOWED_ORIGINS = [
   CLIENT_URL,
+  'https://pujoplan.netlify.app', // Production frontend
+  'https://uma-asche.onrender.com', // Production backend
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost',
@@ -137,8 +139,10 @@ app.use((err, req, res, next) => {
 server.listen(PORT, () => {
   console.log(`\n🪔  PujoPlan API + Socket.io Server →  http://localhost:${PORT}/api`);
   console.log(`    Database                         →  MongoDB Atlas`);
-  console.log(`    Frontend                         →  ${CLIENT_URL}`);
-  console.log(`    Environment                      →  ${process.env.NODE_ENV || 'development'}\n`);
+  console.log(`    Frontend (CLIENT_URL)            →  ${CLIENT_URL}`);
+  console.log(`    Environment                      →  ${process.env.NODE_ENV || 'development'}`);
+  console.log(`    CORS Origins Allowed             →  ${ALLOWED_ORIGINS.join(', ')}`);
+  console.log(`    Socket.io Transports             →  websocket, polling\n`);
 });
 
 process.on('unhandledRejection', (reason) => {

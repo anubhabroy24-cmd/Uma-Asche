@@ -7,7 +7,7 @@ import {
   updateProfile,
   signOut
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
@@ -22,7 +22,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 
 if (Capacitor.isNativePlatform()) {
   try {
@@ -37,7 +39,8 @@ if (Capacitor.isNativePlatform()) {
 }
 
 const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: 'select_account' });
+// REMOVED: prompt: 'select_account' - this was causing permission popup every time!
+// Now Google will remember the user and not ask again
 
 export async function signInWithGoogle() {
   if (Capacitor.isNativePlatform()) {

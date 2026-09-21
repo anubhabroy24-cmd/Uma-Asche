@@ -72,33 +72,42 @@ export function normalizeUser(user) {
 // ── Groups ──────────────────────────────────────────────────────────
 
 export async function fsCreateGroup(group) {
+  const groupRef = doc(db, 'groups', group.id);
+  const cleanAdmin = normalizeUser(group.admin || { id: group.adminId });
+  
+  console.log('[fsCreateGroup] Creating with admin:', cleanAdmin.id, 'admin email:', cleanAdmin.email);
+  
+  const payload = {
+    ...group,
+    admin: cleanAdmin,
+    adminId: cleanAdmin.id,
+    members: [
+      {
+        id: 'mem_admin_' + cleanAdmin.id,
+        userId: cleanAdmin.id,
+        role: 'admin',
+        user: cleanAdmin,
+      },
+    ],
+    memberUids: [cleanAdmin.id, !isGenericEmail(cleanAdmin.email) ? cleanAdmin.email.toLowerCase() : null].filter(Boolean),
+    spots: group.spots || [],
+    createdAt: group.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  
+  console.log('[fsCreateGroup] Payload to write to Firestore:', payload);
+  
   try {
-    const groupRef = doc(db, 'groups', group.id);
-    const cleanAdmin = normalizeUser(group.admin || { id: group.adminId });
-    const payload = {
-      ...group,
-      admin: cleanAdmin,
-      adminId: cleanAdmin.id,
-      members: [
-        {
-          id: 'mem_admin_' + cleanAdmin.id,
-          userId: cleanAdmin.id,
-          role: 'admin',
-          user: cleanAdmin,
-        },
-      ],
-      memberUids: [cleanAdmin.id, !isGenericEmail(cleanAdmin.email) ? cleanAdmin.email.toLowerCase() : null].filter(Boolean),
-      spots: group.spots || [],
-      createdAt: group.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
     await withTimeout(setDoc(groupRef, payload, { merge: true }), 3500);
+    console.log('[fsCreateGroup] Success, group created with ID:', group.id);
     return payload;
   } catch (err) {
-    console.warn('[Firestore] Create group fallback:', err.message);
-    return null;
+    console.error('[fsCreateGroup] FIRESTORE ERROR:', err.message, err.code);
+    throw new Error('Firestore error: ' + (err.message || err.code || 'Unknown error'));
   }
 }
+
+
 
 export async function fsGetGroupById(groupIdOrToken) {
   if (!groupIdOrToken) return null;
@@ -754,3 +763,5 @@ export async function fsGetLocations(groupId) {
     return null;
   }
 }
+
+

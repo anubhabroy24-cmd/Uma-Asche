@@ -2,23 +2,34 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../layouts/AppLayout';
-import { getMyGroups, getMySoloPlans } from '../services/api';
+import { getMyGroups, getMySoloPlans, getLocalGroups, getLocalSoloPlans } from '../services/api';
 import { Users, MapPin, ChevronRight, Plus, KeyRound, Sparkles, Compass } from 'lucide-react';
 import './Dashboard.css';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [groups, setGroups] = useState([]);
-  const [soloPlans, setSoloPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState(() => getLocalGroups());
+  const [soloPlans, setSoloPlans] = useState(() => getLocalSoloPlans());
+  const [loading, setLoading] = useState(() => getLocalGroups().length === 0 && getLocalSoloPlans().length === 0);
 
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    // Instant local cache population
+    setGroups(getLocalGroups());
+    setSoloPlans(getLocalSoloPlans());
+    setLoading(false);
+
+    // Background sync with MongoDB API
     Promise.all([
-      getMyGroups().then(r => setGroups(Array.isArray(r.data) ? r.data : [])).catch(() => setGroups([])),
-      getMySoloPlans().then(r => setSoloPlans(Array.isArray(r.data) ? r.data : [])).catch(() => setSoloPlans([])),
-    ]).finally(() => setLoading(false));
-  }, []);
+      getMyGroups().then(res => res?.data && setGroups(res.data)).catch(() => {}),
+      getMySoloPlans().then(res => res?.data && setSoloPlans(res.data)).catch(() => {}),
+    ]);
+  }, [user]);
 
   const firstName = user?.name?.split(' ')[0] || 'there';
 
@@ -120,4 +131,3 @@ export default function Dashboard() {
     </AppLayout>
   );
 }
-

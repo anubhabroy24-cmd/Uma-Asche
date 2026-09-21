@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getMyGroups, getCallStatus, sendCallSignal } from '../services/api';
 import { startRingtone, stopRingtone } from '../services/ringtoneService';
 import { showMobileNotification } from '../services/notificationService';
-import { joinMultipleGroupRooms, subscribeToIncomingCalls } from '../services/socket';
+import { rtcConfig } from './GroupChat';
 import { Phone, PhoneOff, Video, Radio } from 'lucide-react';
 import './IncomingCallOverlay.css';
 
@@ -31,92 +31,10 @@ export default function IncomingCallOverlay() {
     return false;
   }, [user]);
 
-  // Keep all user's group rooms joined on socket so we get real-time call invites
-  const syncGroupRooms = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data: groups } = await getMyGroups();
-      if (Array.isArray(groups) && groups.length > 0) {
-        groupsRef.current = groups;
-        const gids = groups.map(g => g.id).filter(Boolean);
-        joinMultipleGroupRooms(gids);
-      }
-    } catch (_) { }
-  }, [user]);
-
-  useEffect(() => {
-    syncGroupRooms();
-  }, [syncGroupRooms]);
-
   const activeIncomingCallRef = useRef(activeIncomingCall);
   useEffect(() => {
     activeIncomingCallRef.current = activeIncomingCall;
   }, [activeIncomingCall]);
-
-  // Handle incoming real-time Socket.io call signal
-  const triggerIncomingCall = useCallback((callData) => {
-    if (!user || !callData) return;
-    if (window.__isUserInCall) return;
-
-    // If caller is self, ignore
-    const caller = callData.caller || callData.startedBy;
-    if (caller && isSelf(caller)) return;
-
-    // If user is already on the active call page for this group, don't show overlay
-    if (
-      location.pathname === `/group/${callData.groupId}` &&
-      location.search.includes('call=join')
-    ) {
-      return;
-    }
-
-    const sessionId = `${callData.groupId}_${callData.startedAt || callData.callId || caller?.id || Date.now()}`;
-    if (dismissedSessionsRef.current.has(sessionId)) return;
-
-    // Resolve group name
-    const grp = groupsRef.current.find(g => g.id === callData.groupId);
-    const groupName = callData.groupName || grp?.name || 'Puja Group';
-    const callMode = callData.callMode || 'video';
-
-    setActiveIncomingCall({
-      groupId: callData.groupId,
-      groupName,
-      sessionId,
-      callMode,
-      startedBy: caller || { name: 'Group Member' },
-      startedAt: callData.startedAt || Date.now(),
-    });
-
-    startRingtone();
-
-    const modeLabel = callMode === 'video' ? '📹 Video Call' : '📞 Voice Call';
-    showMobileNotification({
-      title: `Incoming ${modeLabel}`,
-      body: `${caller?.name || 'Group member'} is calling in "${groupName}". Tap to answer!`,
-      id: (Date.now() % 100000),
-    });
-  }, [user, isSelf, location.pathname, location.search]);
-
-  // Real-time Socket.io call invitation listener
-  useEffect(() => {
-    if (!user) return;
-
-    const unsub = subscribeToIncomingCalls(
-      (callData) => {
-        triggerIncomingCall(callData);
-      },
-      (endData) => {
-        if (endData && activeIncomingCallRef.current && (!endData.groupId || endData.groupId === activeIncomingCallRef.current.groupId)) {
-          stopRingtone();
-          setActiveIncomingCall(null);
-        }
-      }
-    );
-
-    return () => {
-      unsub();
-    };
-  }, [user, triggerIncomingCall]);
 
   // Auto-timeout after 45 seconds of continuous ringing if unanswered
   useEffect(() => {
@@ -129,7 +47,7 @@ export default function IncomingCallOverlay() {
     return () => clearTimeout(timer);
   }, [activeIncomingCall]);
 
-  // Polling fallback to verify call state
+  // Polling & Realtime call state checker
   const checkForActiveCalls = useCallback(async () => {
     if (!user || checkingRef.current) return;
     if (window.__isUserInCall) {

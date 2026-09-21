@@ -8,6 +8,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || PRODUCTION_API_URL;
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 8000,
 });
 
 // Attach JWT and user profile headers on every request
@@ -32,7 +33,7 @@ api.interceptors.request.use(config => {
     if (uName) config.headers['X-User-Name'] = encodeURIComponent(uName);
     if (uEmail) config.headers['X-User-Email'] = encodeURIComponent(uEmail);
     if (uPhoto) config.headers['X-User-Photo'] = encodeURIComponent(uPhoto);
-  } catch (_) {}
+  } catch (_) { }
 
   return config;
 });
@@ -180,7 +181,7 @@ export function deduplicateMembers(members = [], adminId, adminObj) {
   return result;
 }
 
-function getLocalGroups() {
+export function getLocalGroups() {
   try {
     const user = getStoredUser();
     if (!user || (!user.id && !user.firebaseUid && !user.email)) return [];
@@ -237,7 +238,7 @@ function getLocalGroups() {
   }
 }
 
-function saveLocalGroups(groups) {
+export function saveLocalGroups(groups) {
   const safe = Array.isArray(groups) ? groups : [];
   const user = getStoredUser();
   if (!user) return;
@@ -255,7 +256,7 @@ function saveLocalGroups(groups) {
   }
 }
 
-function getLocalSoloPlans() {
+export function getLocalSoloPlans() {
   try {
     const user = getStoredUser();
     const userId = user?.id || user?.firebaseUid || (user?.email ? `user_${user.email.replace(/[^a-zA-Z0-9]/g, '_')}` : 'anonymous');
@@ -268,7 +269,7 @@ function getLocalSoloPlans() {
   }
 }
 
-function saveLocalSoloPlans(plans) {
+export function saveLocalSoloPlans(plans) {
   const safe = Array.isArray(plans) ? plans : [];
   const user = getStoredUser();
   const userId = user?.id || user?.firebaseUid || (user?.email ? `user_${user.email.replace(/[^a-zA-Z0-9]/g, '_')}` : 'anonymous');
@@ -988,7 +989,7 @@ function pureSha256(ascii) {
   }
   words[words[lengthProperty]] = (asciiBitLength / maxWord) | 0;
   words[words[lengthProperty]] = asciiBitLength;
-  for (j = 0; j < words[lengthProperty]; ) {
+  for (j = 0; j < words[lengthProperty];) {
     var w = words.slice(j, (j += 16));
     var oldHash = hash;
     hash = hash.slice(0, 8);
@@ -1004,10 +1005,10 @@ function pureSha256(ascii) {
           i < 16
             ? w[i]
             : (w[i - 16] +
-                (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) +
-                w[i - 7] +
-                (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) |
-              0);
+              (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) +
+              w[i - 7] +
+              (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) |
+            0);
       var temp2 =
         (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) +
         ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
