@@ -7,7 +7,7 @@ const AuthContext = createContext(null);
 
 async function createAppSession(firebaseUser) {
   try {
-    const idToken = await firebaseUser.getIdToken(true);
+    const idToken = await firebaseUser.getIdToken();
     return await createSession(idToken);
   } catch (error) {
     if (error.response?.status === 401) {
@@ -151,24 +151,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('pp_google_email');
 
       const result = await signInWithGoogle();
-      const { data } = await createAppSession(result.user);
-      const resolvedName =
-        result.user.displayName ||
-        localStorage.getItem('pp_google_name') ||
-        (data.user?.name && data.user.name !== 'User' ? data.user.name : null) ||
-        result.user.email?.split('@')[0] ||
-        'Pujo Explorer';
-
-      const userObj = {
-        ...data.user,
-        name: resolvedName,
-        firebaseUid: result.user.uid,
-        profileImage: result.user.photoURL || localStorage.getItem('pp_google_photo') || data.user?.profileImage,
-      };
-      localStorage.setItem('pp_token', data.token);
-      localStorage.setItem('pp_user', JSON.stringify(userObj));
-      setUser(userObj);
-      return userObj;
+      return result;
     } catch (e) {
       const msg =
         e.code === 'auth/popup-closed-by-user' ? 'Sign-in cancelled.' :

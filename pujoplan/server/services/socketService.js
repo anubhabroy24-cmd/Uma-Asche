@@ -54,18 +54,27 @@ function initSocket(server, clientUrl) {
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
+      console.log(`[Socket] 🔐 Auth attempt - token exists: ${!!token}`);
       if (token) {
-        const decoded = await verifyIdToken(token).catch(() => null);
+        const decoded = await verifyIdToken(token).catch((err) => {
+          console.warn(`[Socket] ⚠️ Token verification failed:`, err.message);
+          return null;
+        });
         if (decoded) {
           socket.user = decoded;
+          console.log(`[Socket] ✅ Authenticated user: ${decoded.name || decoded.uid}`);
+        } else {
+          console.warn(`[Socket] ❌ Token verification returned null`);
+          socket.user = { uid: 'guest_' + socket.id, name: 'Explorer', id: 'guest_' + socket.id };
         }
-      }
-      if (!socket.user) {
-        socket.user = { uid: 'guest_' + socket.id, name: 'Explorer' };
+      } else {
+        console.warn(`[Socket] ❌ No token provided in auth`);
+        socket.user = { uid: 'guest_' + socket.id, name: 'Explorer', id: 'guest_' + socket.id };
       }
       next();
     } catch (err) {
-      socket.user = { uid: 'guest_' + socket.id, name: 'Explorer' };
+      console.error(`[Socket] ❌ Auth middleware error:`, err.message);
+      socket.user = { uid: 'guest_' + socket.id, name: 'Explorer', id: 'guest_' + socket.id };
       next();
     }
   });

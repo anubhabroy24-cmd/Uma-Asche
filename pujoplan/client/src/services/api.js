@@ -289,35 +289,8 @@ function generatePortableInviteToken(group) {
     const payload = {
       id: group.id,
       name: group.name,
-      region: group.region || 'Kolkata',
-      visitDate: group.visitDate || '',
-      startLocation: group.startLocation || '',
       adminId: group.adminId || group.admin?.id || 'admin',
       adminName: group.admin?.name || 'Admin',
-      adminPhoto: group.admin?.profileImage || null,
-      createdAt: group.createdAt || new Date().toISOString(),
-      spots: (group.spots || []).map(s => ({
-        id: s.id || ('gs_' + (s.spotId || s.spot?.id)),
-        spotId: s.spotId || s.spot?.id,
-        status: s.status || 'suggested',
-        voteCount: s.voteCount || 0,
-        iVoted: false,
-        votes: [],
-        createdAt: s.createdAt || new Date().toISOString(),
-        spot: s.spot ? {
-          id: s.spot.id,
-          name: s.spot.name,
-          area: s.spot.area,
-          region: s.spot.region,
-          latitude: Number(s.spot.latitude),
-          longitude: Number(s.spot.longitude),
-          images: s.spot.images || [],
-          category: s.spot.category || '',
-          crowdLevel: s.spot.crowdLevel || 'Moderate',
-          bestTimeToVisit: s.spot.bestTimeToVisit || '',
-          nearestMetro: s.spot.nearestMetro || '',
-        } : null,
-      })),
     };
     const str = JSON.stringify(payload);
     const b64 = btoa(unescape(encodeURIComponent(str)))

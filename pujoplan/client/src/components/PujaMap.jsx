@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
@@ -109,6 +109,7 @@ const PujaMap = forwardRef(function PujaMap({
   const mapInstanceRef = useRef(null);
   const routeLayerRef = useRef(null);
   const lastUserStartKeyRef = useRef('');
+  const lastRouteFitKeyRef = useRef('');
   const stopMarkersLayerRef = useRef(null);
   const userToStartRouteLayerRef = useRef(null);
   const amenitiesLayerRef = useRef(null);
@@ -159,10 +160,10 @@ const PujaMap = forwardRef(function PujaMap({
   }, []);
 
   // Derive waypoints if routeData is passed instead
-  const effectiveWaypoints = (waypoints && waypoints.length > 0)
-    ? waypoints
-    : (routeData?.stops && routeData?.start)
-      ? [
+  const effectiveWaypoints = useMemo(() => {
+    if (waypoints && waypoints.length > 0) return waypoints;
+    if (routeData?.stops && routeData?.start) {
+      return [
         {
           name: routeData.start.name || 'Start',
           lat: routeData.start.coords?.[0] || 22.5726,
@@ -173,8 +174,17 @@ const PujaMap = forwardRef(function PujaMap({
           lat: s.coords?.[0] || s.spot?.latitude,
           lng: s.coords?.[1] || s.spot?.longitude,
         })),
-      ]
-      : [];
+      ];
+    }
+    return [];
+  }, [waypoints, routeData]);
+
+  const normalizedRouteKey = useMemo(() => {
+    return effectiveWaypoints
+      .filter((w) => w && !isNaN(Number(w.lat)) && !isNaN(Number(w.lng)))
+      .map((w) => `${Number(w.lat).toFixed(4)},${Number(w.lng).toFixed(4)}`)
+      .join('|');
+  }, [effectiveWaypoints]);
 
   // Helper to draw the two stacked polylines: white 10px base under #4285F4 blue 6px top
   const drawRouteLines = useCallback((latLngs) => {
@@ -332,8 +342,8 @@ const PujaMap = forwardRef(function PujaMap({
       (w) => w && !isNaN(Number(w.lat)) && !isNaN(Number(w.lng))
     );
 
-    // Compute stable coordinate serialization key
-    const currentKey = validWaypoints.map(w => `${Number(w.lat).toFixed(4)},${Number(w.lng).toFixed(4)}`).join('|');
+    // Compute stable coordinate serialization key to avoid redraw loops for unchanged routes
+    const currentKey = validWaypoints.map((w) => `${Number(w.lat).toFixed(4)},${Number(w.lng).toFixed(4)}`).join('|');
     if (currentKey === lastRenderedKeyRef.current && currentKey !== '') {
       return; // Waypoint coordinates haven't changed, skip re-rendering to prevent any flicker
     }
@@ -344,6 +354,7 @@ const PujaMap = forwardRef(function PujaMap({
 
     if (validWaypoints.length < 2) {
       if (routeLayerRef.current) routeLayerRef.current.clearLayers();
+      lastRouteFitKeyRef.current = '';
       return;
     }
 
@@ -362,9 +373,13 @@ const PujaMap = forwardRef(function PujaMap({
           const roadLatLngs = route.geometry.coordinates.map((c) => [c[1], c[0]]);
           drawRouteLines(roadLatLngs);
 
-          try {
-            map.fitBounds(roadLatLngs, { padding: [55, 55], maxZoom: 15 });
-          } catch (_) { }
+          const fitKey = `route:${currentKey}`;
+          if (fitKey !== lastRouteFitKeyRef.current) {
+            lastRouteFitKeyRef.current = fitKey;
+            try {
+              map.fitBounds(roadLatLngs, { padding: [55, 55], maxZoom: 15 });
+            } catch (_) { }
+          }
 
           if (onRouteSummaryRef.current) {
             onRouteSummaryRef.current({
@@ -381,7 +396,7 @@ const PujaMap = forwardRef(function PujaMap({
         const straightCoords = validWaypoints.map((w) => [Number(w.lat), Number(w.lng)]);
         drawRouteLines(straightCoords);
       });
-  }, [effectiveWaypoints, drawRouteLines, drawStopMarkers, visitedStops]);
+  }, [normalizedRouteKey, drawRouteLines, drawStopMarkers, visitedStops]);
 
   // ── 2B. Redraw markers when visited state changes (without re-querying OSRM) ──
   useEffect(() => {

@@ -11,6 +11,8 @@ function getAuthToken() {
 
 export function getSocket() {
   if (!socket || socket.disconnected) {
+    const token = getAuthToken();
+    console.log(`[Socket.io] Creating connection with token: ${!!token ? 'YES' : 'NO'}`);
     socket = io(SOCKET_SERVER_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -20,7 +22,9 @@ export function getSocket() {
       timeout: 20000,
       auth: (cb) => {
         // Send JWT token so server knows who the connecting user is
-        cb({ token: getAuthToken() });
+        const currentToken = getAuthToken();
+        console.log(`[Socket.io] 🔐 Sending auth token: ${!!currentToken ? 'YES' : 'NO'}`);
+        cb({ token: currentToken });
       },
     });
 
@@ -52,50 +56,71 @@ export function subscribeToGroupUpdates(groupId, handlers = {}) {
 
   const s = getSocket();
 
-  // Join the group room on the server
-  s.emit('join_group', groupId);
-  console.log('[Socket.io] Joining group room:', groupId);
+  // Wait for socket to be ready before joining group
+  const joinRoom = () => {
+    if (s.connected) {
+      console.log(`[Socket.io] ✅ Socket connected, joining group room: ${groupId}`);
+      s.emit('join_group', groupId);
+    } else {
+      console.warn(`[Socket.io] ⏳ Socket not connected yet, retrying in 500ms...`);
+      setTimeout(joinRoom, 500);
+    }
+  };
+  
+  // Try joining immediately, but also ensure we join after connection
+  joinRoom();
+  
+  const onConnect = () => {
+    console.log(`[Socket.io] 🔄 Reconnected, rejoining group: ${groupId}`);
+    s.emit('join_group', groupId);
+  };
 
   const onMemberJoined = (data) => {
-    console.log('[Socket.io] member_joined:', data);
+    console.log(`[Socket.io] 👤 member_joined:`, data?.member?.user?.name || 'unknown', data);
     handlers.onMemberJoined?.(data);
   };
 
   const onMemberLeft = (data) => {
-    console.log('[Socket.io] member_left:', data);
+    console.log('[Socket.io] 👋 member_left:', data);
     handlers.onMemberLeft?.(data);
   };
 
   const onSpotsUpdated = (data) => {
-    console.log('[Socket.io] spots_updated:', data);
+    console.log('[Socket.io] 📍 spots_updated:', data);
     handlers.onSpotsUpdated?.(data);
   };
 
   const onLocationUpdated = (data) => {
+    console.log('[Socket.io] 📍 location_updated:', data?.userId);
     handlers.onLocationUpdated?.(data);
   };
 
   const onGroupDeleted = (data) => {
-    console.log('[Socket.io] group_deleted:', data);
+    console.log('[Socket.io] 🗑️ group_deleted:', data);
     handlers.onGroupDeleted?.(data);
   };
 
   const onNewMessage = (data) => {
+    console.log('[Socket.io] 💬 new_message:', data?.senderName);
     handlers.onNewMessage?.(data);
   };
 
   const onCallSignal = (data) => {
+    console.log('[Socket.io] ☎️ call_signal:', data);
     handlers.onCallSignal?.(data);
   };
 
   const onIncomingCall = (data) => {
+    console.log('[Socket.io] 📞 incomingCall:', data);
     handlers.onIncomingCall?.(data);
   };
 
   const onCallEnded = (data) => {
+    console.log('[Socket.io] ❌ callEnded:', data);
     handlers.onCallEnded?.(data);
   };
 
+  // Register all event handlers
   s.on('member_joined', onMemberJoined);
   s.on('member_left', onMemberLeft);
   s.on('spots_updated', onSpotsUpdated);
@@ -105,9 +130,11 @@ export function subscribeToGroupUpdates(groupId, handlers = {}) {
   s.on('call_signal', onCallSignal);
   s.on('incomingCall', onIncomingCall);
   s.on('callEnded', onCallEnded);
+  s.on('connect', onConnect);
 
   // Cleanup: unsubscribe and leave room
   return () => {
+    console.log(`[Socket.io] 🚪 Leaving group room: ${groupId}`);
     s.emit('leave_group', groupId);
     s.off('member_joined', onMemberJoined);
     s.off('member_left', onMemberLeft);
@@ -118,6 +145,7 @@ export function subscribeToGroupUpdates(groupId, handlers = {}) {
     s.off('call_signal', onCallSignal);
     s.off('incomingCall', onIncomingCall);
     s.off('callEnded', onCallEnded);
+    s.off('connect', onConnect);
   };
 }
 

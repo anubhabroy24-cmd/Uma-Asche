@@ -1,8 +1,3 @@
-const dns = require('dns');
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
-} catch (_) {}
-
 require('dotenv').config();
 
 const express = require('express');
@@ -98,9 +93,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    database: 'MongoDB Atlas',
+  const dbReady = require('mongoose').connection.readyState === 1;
+  res.status(dbReady ? 200 : 503).json({
+    status: dbReady ? 'ok' : 'degraded',
+    database: dbReady ? 'MongoDB connected' : 'MongoDB unavailable',
+    readyState: require('mongoose').connection.readyState,
     timestamp: new Date().toISOString(),
   });
 });

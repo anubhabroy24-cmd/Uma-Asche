@@ -38,6 +38,41 @@ function decodeInviteToken(token) {
   }
 }
 
+function getUserIdentityKeys(user = {}) {
+  const raw = [
+    user.id,
+    user.uid,
+    user._id,
+    user.firebaseUid,
+    user.email,
+  ].filter(Boolean);
+
+  const ids = raw.filter((value) => typeof value === 'string' && value.trim() !== '');
+  return ids.map((value) => String(value).trim());
+}
+
+function userMatchesMember(user, member) {
+  if (!user || !member) return false;
+
+  const userKeys = getUserIdentityKeys(user);
+  const memberKeys = [
+    member.userId,
+    member.user?.id,
+    member.user?.uid,
+    member.user?.firebaseUid,
+    member.id,
+    member.user?.email,
+    member.email,
+  ].filter(Boolean).map((value) => String(value).trim());
+
+  const userEmails = userKeys.filter((value) => value.includes('@'));
+  const memberEmails = memberKeys.filter((value) => value.includes('@'));
+
+  const sharedId = userKeys.some((key) => memberKeys.includes(key));
+  const sharedEmail = userEmails.some((email) => memberEmails.includes(email.toLowerCase()));
+  return sharedId || sharedEmail;
+}
+
 /* ─────────────────── GROUPS ─────────────────── */
 
 /** POST /api/groups */
@@ -159,7 +194,7 @@ async function getGroupById(req, res, next) {
 
     const isMember =
       uids.some((u) => group.memberUids.includes(u) || group.adminId === u || group.admin?.id === u) ||
-      (group.members || []).some((m) => uids.includes(m.userId) || uids.includes(m.user?.id) || (email && m.user?.email?.toLowerCase().trim() === email)) ||
+      (group.members || []).some((m) => userMatchesMember(user, m)) ||
       (email && group.admin?.email?.toLowerCase().trim() === email);
 
     if (!isMember) {
@@ -376,12 +411,13 @@ async function joinGroup(req, res, next) {
       return res.status(404).json({ error: 'Group not found or invite expired.' });
     }
 
-    const isUserAdmin = group.adminId === user.id;
+    const canonicalUserId = user.id || user.uid || user.firebaseUid;
+    const isUserAdmin = group.adminId === canonicalUserId || group.admin?.id === canonicalUserId;
     const members = group.members || [];
-    const existingIdx = members.findIndex((m) => m.userId === user.id);
+    const existingIdx = members.findIndex((m) => userMatchesMember(user, m));
 
     const cleanUser = {
-      id: user.id,
+      id: canonicalUserId,
       name: user.name || 'Member',
       email: user.email || '',
       profileImage: user.profileImage || null,
@@ -389,17 +425,20 @@ async function joinGroup(req, res, next) {
 
     let newMember = null;
     if (isUserAdmin) {
-      const adminMember = members.find((m) => m.role === 'admin' || m.userId === user.id);
+      const adminMember = members.find((m) => m.role === 'admin' || userMatchesMember(user, m));
       if (adminMember) {
         adminMember.user = cleanUser;
+        adminMember.userId = canonicalUserId;
       }
     } else if (existingIdx !== -1) {
       members[existingIdx].user = cleanUser;
+      members[existingIdx].userId = canonicalUserId;
+      members[existingIdx].id = members[existingIdx].id || `mem_${canonicalUserId}`;
       newMember = members[existingIdx];
     } else {
       newMember = {
         id: 'mem_' + Date.now() + '_' + nanoid(6),
-        userId: user.id,
+        userId: canonicalUserId,
         role: 'member',
         user: cleanUser,
         joinedAt: new Date(),
@@ -407,12 +446,22 @@ async function joinGroup(req, res, next) {
       members.push(newMember);
     }
 
-    if (!group.memberUids.includes(user.id)) {
-      group.memberUids.push(user.id);
+    const nextMemberUids = Array.from(new Set([...(group.memberUids || []), canonicalUserId]));
+    if (user.email && !/^(user@pujoplan\.app|demo@pujoplan\.dev|anonymous)$/i.test(user.email)) {
+      nextMemberUids.push(user.email.toLowerCase().trim());
     }
+    group.memberUids = nextMemberUids.filter(Boolean);
 
     group.members = members;
     await group.save();
+
+    console.log('[GroupController] joinGroup sync:', {
+      groupId: group.id,
+      userId: canonicalUserId,
+      email: user.email || '',
+      memberCount: group.members.length,
+      isUserAdmin,
+    });
 
     // Create system message
     if (!isUserAdmin && existingIdx === -1) {

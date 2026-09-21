@@ -157,6 +157,11 @@ export default function GroupChat({ groupId, currentUser }) {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const isInitialLoadRef = useRef(true);
+  const currentUserRef = useRef(currentUser);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   // ── Call (Voice & Video) State with Stream ──
   const [callActive, setCallActive] = useState(false);
@@ -170,6 +175,8 @@ export default function GroupChat({ groupId, currentUser }) {
   const prevCallActiveRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
+    const user = currentUserRef.current;
+
     try {
       const { data } = await getGroupMessages(groupId);
       if (Array.isArray(data)) {
@@ -177,12 +184,12 @@ export default function GroupChat({ groupId, currentUser }) {
           // Check for any new message from other members
           const newMsgs = data.filter(
             m => m.id !== lastKnownMessageIdRef.current &&
-              !isMsgFromUser(m, currentUser) &&
+              !isMsgFromUser(m, user) &&
               new Date(m.createdAt).getTime() > (window.__lastMsgSeenTime || 0)
           );
           if (newMsgs.length > 0) {
             const latest = newMsgs[newMsgs.length - 1];
-            const senderInfo = getMsgSender(latest, currentUser, false);
+            const senderInfo = getMsgSender(latest, user, false);
             showMobileNotification({
               title: senderInfo.name ? `💬 ${senderInfo.name}` : '💬 New Group Message',
               body: latest.text ? latest.text : '📷 Shared a photo',
@@ -206,7 +213,7 @@ export default function GroupChat({ groupId, currentUser }) {
             (m) =>
               typeof m.id === 'string' &&
               m.id.startsWith('temp-') &&
-              !data.some((dm) => isMsgFromUser(dm, currentUser) && dm.text === m.text && (dm.imageUrl || null) === (m.imageUrl || null))
+              !data.some((dm) => isMsgFromUser(dm, user) && dm.text === m.text && (dm.imageUrl || null) === (m.imageUrl || null))
           );
           if (pendingTemp.length === 0) return data;
           return [...data, ...pendingTemp];
@@ -223,25 +230,38 @@ export default function GroupChat({ groupId, currentUser }) {
         isInitialLoadRef.current = false;
       }
     }
-  }, [groupId, currentUser]);
+  }, [groupId]);
+
+  useEffect(() => {
+    isInitialLoadRef.current = true;
+    setLoading(true);
+    setMessages([]);
+    setError('');
+    lastKnownMessageIdRef.current = null;
+  }, [groupId]);
 
   // Initial fetch + real-time Socket.io subscription + slow fallback poll
   useEffect(() => {
+    if (!groupId) return undefined;
+
     fetchMessages();
+
+    const currentUserSnapshot = currentUserRef.current;
 
     // Real-time: listen for new messages via Socket.io (instant delivery)
     const unsubSocket = subscribeToGroupUpdates(groupId, {
       onNewMessage: (msg) => {
         if (!msg) return;
+        const user = currentUserRef.current || currentUserSnapshot;
         // Avoid duplicate if this was our own optimistic message
         setMessages((prev) => {
           const isDuplicate = prev.some(
-            (m) => m.id === msg.id || (m.id?.startsWith('temp-') && isMsgFromUser(m, currentUser) && m.text === msg.text)
+            (m) => m.id === msg.id || (m.id?.startsWith('temp-') && isMsgFromUser(m, user) && m.text === msg.text)
           );
           if (isDuplicate) return prev;
           // Remove any matching temp message for this content
           const filtered = prev.filter(
-            (m) => !(m.id?.startsWith('temp-') && isMsgFromUser(m, currentUser) && m.text === msg.text)
+            (m) => !(m.id?.startsWith('temp-') && isMsgFromUser(m, user) && m.text === msg.text)
           );
           return [...filtered, msg];
         });
