@@ -55,15 +55,18 @@ export function subscribeToGroupUpdates(groupId, handlers = {}) {
   if (!groupId) return () => {};
 
   const s = getSocket();
+  let disposed = false;
+  let joinTimer = null;
 
   // Wait for socket to be ready before joining group
   const joinRoom = () => {
+    if (disposed) return;
     if (s.connected) {
       console.log(`[Socket.io] ✅ Socket connected, joining group room: ${groupId}`);
       s.emit('join_group', groupId);
     } else {
       console.warn(`[Socket.io] ⏳ Socket not connected yet, retrying in 500ms...`);
-      setTimeout(joinRoom, 500);
+      joinTimer = setTimeout(joinRoom, 500);
     }
   };
   
@@ -134,6 +137,8 @@ export function subscribeToGroupUpdates(groupId, handlers = {}) {
 
   // Cleanup: unsubscribe and leave room
   return () => {
+    disposed = true;
+    if (joinTimer) clearTimeout(joinTimer);
     console.log(`[Socket.io] 🚪 Leaving group room: ${groupId}`);
     s.emit('leave_group', groupId);
     s.off('member_joined', onMemberJoined);

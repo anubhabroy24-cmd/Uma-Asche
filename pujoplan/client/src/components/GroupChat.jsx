@@ -158,6 +158,9 @@ export default function GroupChat({ groupId, currentUser }) {
   const fileInputRef = useRef(null);
   const isInitialLoadRef = useRef(true);
   const currentUserRef = useRef(currentUser);
+  const messagesRequestActiveRef = useRef(false);
+  const callRequestActiveRef = useRef(false);
+  const previousMessageCountRef = useRef(0);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -175,6 +178,8 @@ export default function GroupChat({ groupId, currentUser }) {
   const prevCallActiveRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
+    if (messagesRequestActiveRef.current) return;
+    messagesRequestActiveRef.current = true;
     const user = currentUserRef.current;
 
     try {
@@ -225,6 +230,7 @@ export default function GroupChat({ groupId, currentUser }) {
         setError(e.response?.data?.error || 'Failed to load group chat.');
       }
     } finally {
+      messagesRequestActiveRef.current = false;
       if (isInitialLoadRef.current) {
         setLoading(false);
         isInitialLoadRef.current = false;
@@ -238,6 +244,7 @@ export default function GroupChat({ groupId, currentUser }) {
     setMessages([]);
     setError('');
     lastKnownMessageIdRef.current = null;
+    previousMessageCountRef.current = 0;
   }, [groupId]);
 
   // Initial fetch + real-time Socket.io subscription + slow fallback poll
@@ -280,11 +287,15 @@ export default function GroupChat({ groupId, currentUser }) {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const behavior = previousMessageCountRef.current === 0 ? 'auto' : 'smooth';
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    previousMessageCountRef.current = messages.length;
   }, [messages]);
 
   // ── Poll Call Status ──
   const pollCallStatus = useCallback(async () => {
+    if (callRequestActiveRef.current) return;
+    callRequestActiveRef.current = true;
     try {
       const { data } = await getCallStatus(groupId);
 
@@ -311,14 +322,18 @@ export default function GroupChat({ groupId, currentUser }) {
         return data.startedBy || null;
       });
     } catch (_) { }
+    finally {
+      callRequestActiveRef.current = false;
+    }
   }, [groupId, isInCall]);
 
   // ── Live Call State Polling ──
   useEffect(() => {
-    pollCallStatus();
-    const interval = setInterval(pollCallStatus, 3000);
+    let timerId = setTimeout(pollCallStatus, 1200);
+    const interval = setInterval(pollCallStatus, 10000);
 
     return () => {
+      clearTimeout(timerId);
       clearInterval(interval);
       try {
         import('../services/ringtoneService').then(m => m.stopRingtone());
