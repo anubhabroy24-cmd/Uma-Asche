@@ -4,6 +4,17 @@ import { solveNearestNeighbor } from '../utils/routeOptimizer';
 
 export const PRODUCTION_API_URL = 'https://uma-asche.onrender.com/api';
 export const API_BASE_URL = import.meta.env.VITE_API_URL || PRODUCTION_API_URL;
+export const PUBLIC_APP_URL = import.meta.env.VITE_APP_URL || 'https://pujoplan.netlify.app';
+
+export function getInviteUrl(token) {
+  const cleanToken = String(token || '').trim();
+  if (!cleanToken) return '';
+  const browserOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = browserOrigin.startsWith('http') && !browserOrigin.includes('onrender.com')
+    ? browserOrigin
+    : PUBLIC_APP_URL;
+  return `${origin}/join/${encodeURIComponent(cleanToken)}`;
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -285,22 +296,7 @@ function generateRandomToken(len = 7) {
 }
 
 function generatePortableInviteToken(group) {
-  try {
-    const payload = {
-      id: group.id,
-      name: group.name,
-      adminId: group.adminId || group.admin?.id || 'admin',
-      adminName: group.admin?.name || 'Admin',
-    };
-    const str = JSON.stringify(payload);
-    const b64 = btoa(unescape(encodeURIComponent(str)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-    return 'PJ_' + b64;
-  } catch (e) {
-    return generateRandomToken(7);
-  }
+  return `PJ_${generateRandomToken(12)}`;
 }
 
 function decodePortableInviteToken(token) {

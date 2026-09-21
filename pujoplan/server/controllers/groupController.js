@@ -6,24 +6,9 @@ const { emitGroupUpdate } = require('../services/socketService');
 const { nanoid } = require('nanoid');
 
 
-// Helper to generate portable or standard invite tokens
+// New invites contain only a short opaque ID. Older PJ_ payload tokens remain readable below.
 function generateInviteToken(groupId, name, adminId) {
-  try {
-    const payload = {
-      id: groupId,
-      name: name || 'Pujo Group',
-      adminId: adminId || 'admin',
-      createdAt: new Date().toISOString(),
-    };
-    const jsonStr = JSON.stringify(payload);
-    const b64 = Buffer.from(jsonStr, 'utf-8').toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-    return `PJ_${b64}`;
-  } catch (_) {
-    return 'PJ_' + nanoid(10);
-  }
+  return `PJ_${nanoid(12)}`;
 }
 
 function decodeInviteToken(token) {
