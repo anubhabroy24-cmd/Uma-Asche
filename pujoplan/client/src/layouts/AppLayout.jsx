@@ -16,6 +16,7 @@ export default function AppLayout({ children, title, back, onBack, theme = '' })
 
   return (
     <div className={`app-shell ${theme ? `app-shell--${theme}` : ''}`}>
+      <div className="app-shell__bg-art" aria-hidden="true" />
       {/* ── Top header ── */}
       <header className="app-header">
         <div className="app-header__left">

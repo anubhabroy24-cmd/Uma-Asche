@@ -9,8 +9,25 @@
   max-width: 480px;       /* max phone width */
   margin: 0 auto;
   position: relative;
+  isolation: isolate;
   /* subtle left/right border on tablet+ so it looks like a phone frame */
   box-shadow: 0 0 0 1px var(--black-4);
+}
+
+.app-shell__bg-art {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  width: min(52vw, 520px);
+  height: 100dvh;
+  pointer-events: none;
+  background-image: url('../assets/durga_chat_bg.png');
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: auto 100%;
+  opacity: 0.1;
+  filter: saturate(0.9);
 }
 
 /* ── Top header ─────────────────────────── */
@@ -30,8 +47,6 @@
 
 .app-header__left  { display: flex; align-items: center; }
 .app-header__center { display: flex; align-items: center; justify-content: center; }
-.app-header__right { display: flex; align-items: center; justify-content: flex-end; }
-
 .app-header__logo {
   font-size: 1.05rem;
   font-weight: 900;
