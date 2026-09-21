@@ -1059,20 +1059,7 @@ export const getStreamCallToken = async (groupId, callId) => {
     }
   }
 
-  // Generate valid Stream Video token client-side so calls work directly on APK/Web
-  const fallbackToken = await generateClientStreamToken(userId);
-
-  return {
-    data: {
-      token: fallbackToken,
-      apiKey: STREAM_API_KEY,
-      userId,
-      userName: user.name || 'Group Member',
-      userImage: user.profileImage || undefined,
-      callId: targetCallId,
-      callType: 'default',
-    },
-  };
+  throw new Error('Video call service is unavailable. Please try again.');
 };
 
 export const sendCallSignal = async (groupId, signalData = {}) => {

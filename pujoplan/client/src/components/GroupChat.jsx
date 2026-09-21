@@ -1,6 +1,7 @@
-import { getGroupMessages, sendGroupMessage, getCallStatus } from '../services/api';
+import { getGroupMessages, sendGroupMessage, getCallStatus, sendCallSignal } from '../services/api';
 import { showMobileNotification } from '../services/notificationService';
 import { subscribeToGroupUpdates } from '../services/socket';
+import StreamCallModal from './StreamCallModal';
 import {
   Send, MessageSquare, AlertCircle, Phone, PhoneOff,
   Mic, MicOff, Volume2, Users, Radio, Video, VideoOff,
@@ -343,12 +344,32 @@ export default function GroupChat({ groupId, currentUser }) {
 
 
   // ── Start / Join Call (Voice or Video) with Stream ──
-  function handleStartOrJoinCall(mode = 'video') {
-    setCallMode(mode);
-    setIsInCall(true);
+  async function handleStartOrJoinCall(mode = 'video') {
+    if (callConnecting) return;
+    setCallConnecting(true);
     try {
-      import('../services/ringtoneService').then(m => m.stopRingtone());
-    } catch (_) { }
+      await sendCallSignal(groupId, {
+        type: callActive ? 'accept' : 'start',
+        callMode: mode,
+        callId: `group_${groupId}`,
+      });
+      setCallMode(mode);
+      setIsInCall(true);
+      import('../services/ringtoneService').then(m => m.stopRingtone()).catch(() => {});
+    } catch (err) {
+      setError(err.message || 'Unable to start the group call.');
+    } finally {
+      setCallConnecting(false);
+    }
+  }
+
+  async function handleCloseCall() {
+    await sendCallSignal(groupId, {
+      type: 'leave',
+      callMode,
+      callId: `group_${groupId}`,
+    }).catch(() => {});
+    setIsInCall(false);
   }
 
   async function handleFileSelect(e) {
@@ -462,7 +483,7 @@ export default function GroupChat({ groupId, currentUser }) {
           currentUser={currentUser}
           callMode={callMode}
           isOpen={isInCall}
-          onClose={() => setIsInCall(false)}
+          onClose={handleCloseCall}
         />
       )}
 
