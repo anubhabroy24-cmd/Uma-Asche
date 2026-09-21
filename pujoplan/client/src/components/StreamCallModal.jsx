@@ -17,41 +17,31 @@ export default function StreamCallModal({ groupId, groupName, currentUser, callM
 
   useEffect(() => {
     if (!isOpen || !groupId || !currentUser) return undefined;
-
     let cancelled = false;
     let client;
     let call;
 
-    async function startCall() {
+    async function connect() {
       try {
         setError('');
         const { data } = await getStreamCallToken(groupId, `group_${groupId}`);
-        if (!data?.token || !data?.apiKey || !data?.userId) {
-          throw new Error('Stream call token was not returned.');
-        }
-
+        if (!data?.token || !data?.apiKey || !data?.userId) throw new Error('Stream call token unavailable.');
         client = new StreamVideoClient({
           apiKey: data.apiKey,
-          user: {
-            id: data.userId,
-            name: data.userName || currentUser.name || 'Group Member',
-            image: data.userImage || currentUser.profileImage || undefined,
-          },
+          user: { id: data.userId, name: data.userName || currentUser.name || 'Group Member', image: data.userImage || currentUser.profileImage || undefined },
           token: data.token,
         });
         call = client.call('default', data.callId || `group_${groupId}`);
         await call.join({ create: true });
-
         if (!cancelled) setSession({ client, call });
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Unable to start the Stream call.');
+        if (!cancelled) setError(err.message || 'Unable to connect to the group call.');
         if (call) await call.leave().catch(() => {});
         if (client) await client.disconnectUser().catch(() => {});
       }
     }
 
-    startCall();
-
+    connect();
     return () => {
       cancelled = true;
       setSession(null);
@@ -61,7 +51,6 @@ export default function StreamCallModal({ groupId, groupName, currentUser, callM
   }, [groupId, currentUser, isOpen]);
 
   if (!isOpen) return null;
-
   return (
     <div className="stream-call-modal" role="dialog" aria-modal="true" aria-label={`${callMode || 'video'} call with ${groupName}`}>
       {session ? (

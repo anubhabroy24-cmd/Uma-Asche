@@ -1,7 +1,8 @@
-import { getGroupMessages, sendGroupMessage, getCallStatus, sendCallSignal } from '../services/api';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { getGroupMessages, sendGroupMessage, getCallStatus } from '../services/api';
+import StreamCallModal from './StreamCallModal';
 import { showMobileNotification } from '../services/notificationService';
 import { subscribeToGroupUpdates } from '../services/socket';
-import StreamCallModal from './StreamCallModal';
 import {
   Send, MessageSquare, AlertCircle, Phone, PhoneOff,
   Mic, MicOff, Volume2, Users, Radio, Video, VideoOff,
@@ -159,9 +160,6 @@ export default function GroupChat({ groupId, currentUser }) {
   const fileInputRef = useRef(null);
   const isInitialLoadRef = useRef(true);
   const currentUserRef = useRef(currentUser);
-  const messagesRequestActiveRef = useRef(false);
-  const callRequestActiveRef = useRef(false);
-  const previousMessageCountRef = useRef(0);
 
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -179,8 +177,6 @@ export default function GroupChat({ groupId, currentUser }) {
   const prevCallActiveRef = useRef(false);
 
   const fetchMessages = useCallback(async () => {
-    if (messagesRequestActiveRef.current) return;
-    messagesRequestActiveRef.current = true;
     const user = currentUserRef.current;
 
     try {
@@ -231,7 +227,6 @@ export default function GroupChat({ groupId, currentUser }) {
         setError(e.response?.data?.error || 'Failed to load group chat.');
       }
     } finally {
-      messagesRequestActiveRef.current = false;
       if (isInitialLoadRef.current) {
         setLoading(false);
         isInitialLoadRef.current = false;
@@ -245,7 +240,6 @@ export default function GroupChat({ groupId, currentUser }) {
     setMessages([]);
     setError('');
     lastKnownMessageIdRef.current = null;
-    previousMessageCountRef.current = 0;
   }, [groupId]);
 
   // Initial fetch + real-time Socket.io subscription + slow fallback poll
@@ -288,15 +282,11 @@ export default function GroupChat({ groupId, currentUser }) {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    const behavior = previousMessageCountRef.current === 0 ? 'auto' : 'smooth';
-    messagesEndRef.current?.scrollIntoView({ behavior });
-    previousMessageCountRef.current = messages.length;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   // ── Poll Call Status ──
   const pollCallStatus = useCallback(async () => {
-    if (callRequestActiveRef.current) return;
-    callRequestActiveRef.current = true;
     try {
       const { data } = await getCallStatus(groupId);
 
@@ -323,18 +313,14 @@ export default function GroupChat({ groupId, currentUser }) {
         return data.startedBy || null;
       });
     } catch (_) { }
-    finally {
-      callRequestActiveRef.current = false;
-    }
   }, [groupId, isInCall]);
 
   // ── Live Call State Polling ──
   useEffect(() => {
-    let timerId = setTimeout(pollCallStatus, 1200);
-    const interval = setInterval(pollCallStatus, 10000);
+    pollCallStatus();
+    const interval = setInterval(pollCallStatus, 3000);
 
     return () => {
-      clearTimeout(timerId);
       clearInterval(interval);
       try {
         import('../services/ringtoneService').then(m => m.stopRingtone());
@@ -344,32 +330,12 @@ export default function GroupChat({ groupId, currentUser }) {
 
 
   // ── Start / Join Call (Voice or Video) with Stream ──
-  async function handleStartOrJoinCall(mode = 'video') {
-    if (callConnecting) return;
-    setCallConnecting(true);
+  function handleStartOrJoinCall(mode = 'video') {
+    setCallMode(mode);
+    setIsInCall(true);
     try {
-      await sendCallSignal(groupId, {
-        type: callActive ? 'accept' : 'start',
-        callMode: mode,
-        callId: `group_${groupId}`,
-      });
-      setCallMode(mode);
-      setIsInCall(true);
-      import('../services/ringtoneService').then(m => m.stopRingtone()).catch(() => {});
-    } catch (err) {
-      setError(err.message || 'Unable to start the group call.');
-    } finally {
-      setCallConnecting(false);
-    }
-  }
-
-  async function handleCloseCall() {
-    await sendCallSignal(groupId, {
-      type: 'leave',
-      callMode,
-      callId: `group_${groupId}`,
-    }).catch(() => {});
-    setIsInCall(false);
+      import('../services/ringtoneService').then(m => m.stopRingtone());
+    } catch (_) { }
   }
 
   async function handleFileSelect(e) {
@@ -483,7 +449,7 @@ export default function GroupChat({ groupId, currentUser }) {
           currentUser={currentUser}
           callMode={callMode}
           isOpen={isInCall}
-          onClose={handleCloseCall}
+          onClose={() => setIsInCall(false)}
         />
       )}
 
