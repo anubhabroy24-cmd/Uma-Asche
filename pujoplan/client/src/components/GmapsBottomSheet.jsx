@@ -198,22 +198,7 @@ export default function GmapsBottomSheet({
         </div>
       )}
 
-      {/* Horizontally Scrollable Nominatim Suggestion Chips Bar */}
-      <div className="gmaps-chips-container">
-        <div className="gmaps-chips-track">
-          {NOMINATIM_CHIPS.map((chip) => (
-            <button
-              key={chip.name}
-              type="button"
-              className="gmaps-nav-chip"
-              onClick={() => onAddWaypoint({ name: chip.name, lat: chip.lat, lng: chip.lng })}
-            >
-              <MapPin size={12} color="#8ab4f8" />
-              <span>{chip.name}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+
 
       {/* Draggable Bottom Sheet */}
       <div
@@ -273,10 +258,50 @@ export default function GmapsBottomSheet({
         {/* Sheet Body (Visible in 'half' and 'full' states) */}
         <div className="gmaps-sheet-scrollable-body">
 
+          {/* Real-Time Location Sharing Card */}
+          <div className="gmaps-sharing-control-card">
+            <div className="gmaps-sharing-left">
+              <div className={`gmaps-sharing-indicator ${isSharing ? 'gmaps-sharing-indicator--active' : ''}`}>
+                <Navigation size={18} className="gmaps-nav-icon" />
+              </div>
+              <div className="gmaps-sharing-meta">
+                <div className="gmaps-sharing-title-row">
+                  <span className="gmaps-sharing-title">Location sharing</span>
+                  <span className={`gmaps-live-pill ${isSharing ? 'gmaps-live-pill--on' : ''}`}>
+                    {isSharing ? '● SHARING' : 'OFF'}
+                  </span>
+                </div>
+                <span className="gmaps-sharing-sub">
+                  {isSharing
+                    ? 'Updating live GPS via watchPosition (every 5s)'
+                    : 'Share real-time GPS with group members'}
+                </span>
+              </div>
+            </div>
 
+            <button
+              type="button"
+              className={`gmaps-share-toggle-btn ${isSharing ? 'gmaps-share-toggle-btn--stop' : 'gmaps-share-toggle-btn--start'}`}
+              onClick={onToggleSharing}
+              disabled={sharingLoading}
+            >
+              {sharingLoading ? (
+                <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+              ) : isSharing ? (
+                <>
+                  <EyeOff size={15} />
+                  <span>Stop</span>
+                </>
+              ) : (
+                <>
+                  <Navigation size={15} />
+                  <span>Share</span>
+                </>
+              )}
+            </button>
+          </div>
 
-
-          {/* Waypoints & Stop Reordering Section with Nearest-Neighbor Order & Live Distances */}
+          {/* Waypoints & Stop Reordering Section with Nearest-Neighbor Order */}
           <div className="gmaps-stops-section">
             <div className="gmaps-stops-header">
               <div className="gmaps-stops-header-title-area">
