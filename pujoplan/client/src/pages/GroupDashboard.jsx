@@ -12,7 +12,7 @@ import {
   getGroupById, voteGroupSpot, removeGroupSpot,
   finalizeGroupSpot, generateGroupRoute,
   removeMember, leaveGroup, regenerateInvite, deleteGroup,
-  getGroupLocations, updateGroupLocation, deduplicateMembers, getInviteUrl,
+  getGroupLocations, updateGroupLocation, deduplicateMembers,
 } from '../services/api';
 import { getReliableCurrentLocation } from '../services/routingService';
 import {
@@ -417,7 +417,6 @@ export default function GroupDashboard() {
           (currentUserEmail && !isGenericEmail(m.user?.email) && m.user?.email?.toLowerCase().trim() === currentUserEmail)) &&
         m.role === 'admin'
     );
-  const inviteUrl = group ? getInviteUrl(group.inviteToken) : '';
   const inviteCode = group?.inviteToken || '';
 
   const load = useCallback(async (isSilent = false) => {
@@ -867,18 +866,16 @@ export default function GroupDashboard() {
   }
 
   function copyInvite() {
-    const linkToCopy = inviteUrl || inviteCode;
-    navigator.clipboard.writeText(linkToCopy);
+    navigator.clipboard.writeText(inviteCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
   function shareInvite() {
-    const linkToShare = inviteUrl || inviteCode;
     if (navigator.share) {
       navigator.share({
         title: `Join ${group.name} on PujoPlan`,
-        text: `Join my Durga Puja group "${group.name}" on PujoPlan:\n\n${linkToShare}`,
+        text: `Join my Durga Puja group "${group.name}" on PujoPlan.\n\nGroup code: ${inviteCode}`,
       }).catch(() => { });
     } else {
       copyInvite();
@@ -1020,11 +1017,11 @@ export default function GroupDashboard() {
         {/* ── 1. Plan Tab (Pandal Selection & Management) ── */}
         {activeTab === 'plan' && (
           <div className="gd__tab-pane">
-            {/* Shareable invite link */}
+            {/* Numeric group entry key */}
             <div className="gd__invite">
               <div className="gd__invite-text">
-                <span className="gd__invite-label">Invite Link</span>
-                <span className="gd__invite-code">{inviteUrl || inviteCode}</span>
+                <span className="gd__invite-label">Group Code</span>
+                <span className="gd__invite-code">{inviteCode}</span>
               </div>
               <button className="btn btn-yellow btn-sm" onClick={copyInvite}>
                 {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -1034,7 +1031,7 @@ export default function GroupDashboard() {
                 <Share2 size={15} />
               </button>
               {isAdmin && (
-                  <button className="btn btn-ghost btn-sm" onClick={handleRegenInvite} title="Regenerate invite link" style={{ padding: '8px 8px' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={handleRegenInvite} title="Regenerate group code" style={{ padding: '8px 8px' }}>
                   ↻
                 </button>
               )}

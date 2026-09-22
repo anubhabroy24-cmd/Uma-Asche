@@ -26,7 +26,7 @@ export default function JoinByCode() {
       <div className="page-wrap join-code">
         <div className="join-code__icon"><KeyRound size={24} /></div>
         <h1>Join with code</h1>
-        <p>Enter the invite code shared by your group admin.</p>
+        <p>Enter the 8-digit group code shared by your group admin.</p>
 
         <form onSubmit={handleSubmit}>
           <label htmlFor="invite-code">Invite code</label>
@@ -34,7 +34,7 @@ export default function JoinByCode() {
             id="invite-code"
             value={code}
             onChange={event => setCode(event.target.value)}
-            placeholder="Paste invite code"
+            placeholder="Enter 8-digit code"
             autoComplete="off"
             autoFocus
           />

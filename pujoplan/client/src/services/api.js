@@ -4,17 +4,6 @@ import { solveNearestNeighbor } from '../utils/routeOptimizer';
 
 export const PRODUCTION_API_URL = 'https://uma-asche.onrender.com/api';
 export const API_BASE_URL = import.meta.env.VITE_API_URL || PRODUCTION_API_URL;
-export const PUBLIC_APP_URL = import.meta.env.VITE_APP_URL || 'https://pujoplan.netlify.app';
-
-export function getInviteUrl(token) {
-  const cleanToken = String(token || '').trim();
-  if (!cleanToken) return '';
-  const browserOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const origin = browserOrigin.startsWith('http') && !browserOrigin.includes('onrender.com')
-    ? browserOrigin
-    : PUBLIC_APP_URL;
-  return `${origin}/join/${encodeURIComponent(cleanToken)}`;
-}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -142,7 +131,7 @@ function saveSharedGroup(group) {
     group._count = group._count || {};
     group._count.members = group.members.length;
     group._count.spots = (group.spots || []).length;
-    group.inviteToken = generatePortableInviteToken(group);
+    if (!group.inviteToken) group.inviteToken = generatePortableInviteToken(group);
 
     localStorage.setItem(`pp_shared_group_${group.id}`, JSON.stringify(group));
   } catch (_) { }
@@ -296,7 +285,7 @@ function generateRandomToken(len = 7) {
 }
 
 function generatePortableInviteToken(group) {
-  return `PJ_${generateRandomToken(12)}`;
+  return generateRandomToken(8).replace(/[^0-9]/g, '').padEnd(8, '0');
 }
 
 function decodePortableInviteToken(token) {
@@ -1059,7 +1048,20 @@ export const getStreamCallToken = async (groupId, callId) => {
     }
   }
 
-  throw new Error('Video call service is unavailable. Please try again.');
+  // Generate valid Stream Video token client-side so calls work directly on APK/Web
+  const fallbackToken = await generateClientStreamToken(userId);
+
+  return {
+    data: {
+      token: fallbackToken,
+      apiKey: STREAM_API_KEY,
+      userId,
+      userName: user.name || 'Group Member',
+      userImage: user.profileImage || undefined,
+      callId: targetCallId,
+      callType: 'default',
+    },
+  };
 };
 
 export const sendCallSignal = async (groupId, signalData = {}) => {

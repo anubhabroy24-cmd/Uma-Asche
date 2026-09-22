@@ -3,12 +3,13 @@ const Message = require('../models/Message');
 const Call = require('../models/Call');
 const Presence = require('../models/Presence');
 const { emitGroupUpdate } = require('../services/socketService');
-const { nanoid } = require('nanoid');
+const { nanoid, customAlphabet } = require('nanoid');
 
+const numericInvite = customAlphabet('0123456789', 8);
 
-// New invites contain only a short opaque ID. Older PJ_ payload tokens remain readable below.
+// New invites are numeric keys. Older PJ_ payload tokens remain readable below.
 function generateInviteToken(groupId, name, adminId) {
-  return `PJ_${nanoid(12)}`;
+  return numericInvite();
 }
 
 function decodeInviteToken(token) {
@@ -225,6 +226,11 @@ async function getGroupById(req, res, next) {
       group.markModified('admin');
       group.markModified('memberUids');
       await group.save().catch(() => { });
+    }
+
+    if (!/^\d{8}$/.test(group.inviteToken || '')) {
+      group.inviteToken = generateInviteToken(group.id, group.name, group.adminId);
+      await group.save();
     }
 
     return res.json(group.toClientJSON(uid));
