@@ -804,7 +804,7 @@ async function getGroupLocations(req, res, next) {
 async function updateMemberLocation(req, res, next) {
   try {
     const { id } = req.params;
-    const { latitude, longitude, accuracy, isSharingLocation } = req.body;
+    const { latitude, longitude, accuracy, isSharingLocation, battery } = req.body;
     const user = req.user;
 
     const presence = await Presence.findOneAndUpdate(
@@ -817,6 +817,7 @@ async function updateMemberLocation(req, res, next) {
           longitude: longitude !== undefined ? longitude : null,
           accuracy: accuracy !== undefined ? accuracy : null,
           isSharingLocation: isSharingLocation !== undefined ? isSharingLocation : true,
+          ...(battery !== undefined && battery !== null ? { battery: Math.round(Number(battery)) } : {}),
           lastSeen: new Date(),
         },
       },

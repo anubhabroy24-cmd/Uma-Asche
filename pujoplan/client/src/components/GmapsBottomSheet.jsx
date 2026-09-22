@@ -237,15 +237,7 @@ export default function GmapsBottomSheet({
         {/* Peek / Header Content */}
         <div className="gmaps-sheet-peek-row">
           <div className="gmaps-sheet-eta-main">
-            {routeData ? (
-              <>
-                <span className="gmaps-eta-value">{routeData.estimatedDurationMin}</span>
-                <span className="gmaps-eta-unit">min</span>
-                <span className="gmaps-eta-dist">({routeData.totalDistanceKm} km)</span>
-              </>
-            ) : (
-              <span className="gmaps-eta-calculating">Planning route…</span>
-            )}
+            <span className="gmaps-eta-calculating">Pandal Route</span>
           </div>
 
           <div className="gmaps-sheet-quick-actions">
@@ -280,48 +272,7 @@ export default function GmapsBottomSheet({
 
         {/* Sheet Body (Visible in 'half' and 'full' states) */}
         <div className="gmaps-sheet-scrollable-body">
-          {/* Real-Time Location Sharing Card */}
-          <div className="gmaps-sharing-control-card">
-            <div className="gmaps-sharing-left">
-              <div className={`gmaps-sharing-indicator ${isSharing ? 'gmaps-sharing-indicator--active' : ''}`}>
-                <Navigation size={18} className="gmaps-nav-icon" />
-              </div>
-              <div className="gmaps-sharing-meta">
-                <div className="gmaps-sharing-title-row">
-                  <span className="gmaps-sharing-title">Location sharing</span>
-                  <span className={`gmaps-live-pill ${isSharing ? 'gmaps-live-pill--on' : ''}`}>
-                    {isSharing ? '● SHARING' : 'OFF'}
-                  </span>
-                </div>
-                <span className="gmaps-sharing-sub">
-                  {isSharing
-                    ? 'Updating live GPS via watchPosition (every 5s)'
-                    : 'Share real-time GPS with group members'}
-                </span>
-              </div>
-            </div>
 
-            <button
-              type="button"
-              className={`gmaps-share-toggle-btn ${isSharing ? 'gmaps-share-toggle-btn--stop' : 'gmaps-share-toggle-btn--start'}`}
-              onClick={onToggleSharing}
-              disabled={sharingLoading}
-            >
-              {sharingLoading ? (
-                <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-              ) : isSharing ? (
-                <>
-                  <EyeOff size={15} />
-                  <span>Stop</span>
-                </>
-              ) : (
-                <>
-                  <Navigation size={15} />
-                  <span>Share</span>
-                </>
-              )}
-            </button>
-          </div>
 
 
 
@@ -342,32 +293,7 @@ export default function GmapsBottomSheet({
 
             </div>
 
-            {/* Live Distance Summary Strip */}
-            {waypoints.length > 1 && (
-              <div className="gmaps-stops-summary-strip">
-                <div className="gmaps-summary-strip-left">
-                  <span className="gmaps-summary-dot"></span>
-                  <span className="gmaps-summary-text">
-                    Start: <strong>{waypoints[0]?.name?.split('(')[0]?.trim()}</strong>
-                  </span>
-                  {onToggleStartOrigin && (
-                    <button
-                      type="button"
-                      className={`gmaps-origin-toggle-btn ${startFromMe ? 'gmaps-origin-toggle-btn--gps' : ''}`}
-                      onClick={onToggleStartOrigin}
-                      title={startFromMe ? "Switch to Group Plan's designated starting point" : "Switch to My Live GPS as Starting point"}
-                    >
-                      {startFromMe ? "📍 Plan Start" : "📱 My GPS"}
-                    </button>
-                  )}
-                </div>
-                <div className="gmaps-summary-strip-right">
-                  <span className="gmaps-summary-dist">
-                    ∑ Straight-line: <strong>{Number(waypoints[waypoints.length - 1]?.cumulativeDistanceKm || 0).toFixed(1)} km</strong>
-                  </span>
-                </div>
-              </div>
-            )}
+
 
             {/* Numbered List of Stops */}
             <div className="gmaps-stops-list">
@@ -407,16 +333,6 @@ export default function GmapsBottomSheet({
                         <span className="gmaps-stop-sub">
                           {isStart ? 'Starting Location' : isVisited ? '✅ Visited' : `Stop #${index}`}
                         </span>
-                        {!isStart && wp.legDistanceKm !== undefined && (
-                          <span className="gmaps-leg-dist-badge">
-                            +{wp.legDistanceKm} km from {index === 1 ? 'Start' : `Stop ${index - 1}`}
-                          </span>
-                        )}
-                        {!isStart && wp.cumulativeDistanceKm !== undefined && (
-                          <span className="gmaps-cumul-dist-badge">
-                            (Cumul: {wp.cumulativeDistanceKm} km)
-                          </span>
-                        )}
                       </div>
                     </div>
 

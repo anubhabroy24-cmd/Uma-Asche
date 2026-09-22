@@ -10,6 +10,7 @@ const presenceSchema = new mongoose.Schema(
     longitude: { type: Number, default: null },
     accuracy: { type: Number, default: null },
     isSharingLocation: { type: Boolean, default: false },
+    battery: { type: Number, default: null }, // 0–100 battery percentage
     lastSeen: { type: Date, default: Date.now },
   },
   { timestamps: true }

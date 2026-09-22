@@ -643,6 +643,32 @@ export default function GroupDashboard() {
 
   // Continuous GPS watch & sync when sharing
   const lastWriteTimeRef = useRef(0);
+
+  // ── Battery helper (Web Battery API, non-blocking) ──
+  const getBatteryLevel = useCallback(async () => {
+    try {
+      if (navigator.getBattery) {
+        const batt = await navigator.getBattery();
+        return Math.round(batt.level * 100);
+      }
+    } catch (_) {}
+    return null;
+  }, []);
+
+  // Battery-only heartbeat every 30s for ALL members (even non-GPS-sharing)
+  useEffect(() => {
+    if (!user?.id || !id) return;
+    const sendBattery = async () => {
+      const level = await getBatteryLevel();
+      if (level !== null) {
+        updateGroupLocation(id, { battery: level, isSharingLocation: isSharing }).catch(() => {});
+      }
+    };
+    sendBattery(); // immediate first send
+    const battInterval = setInterval(sendBattery, 30000);
+    return () => clearInterval(battInterval);
+  }, [id, user?.id, isSharing, getBatteryLevel]);
+
   useEffect(() => {
     if (!isSharing) return;
 
@@ -663,11 +689,14 @@ export default function GroupDashboard() {
             const now = Date.now();
             if (now - lastWriteTimeRef.current > 5000) {
               lastWriteTimeRef.current = now;
-              updateGroupLocation(id, {
-                latitude: loc.latitude,
-                longitude: loc.longitude,
-                isSharingLocation: true,
-              }).catch(() => { });
+              getBatteryLevel().then((battery) => {
+                updateGroupLocation(id, {
+                  latitude: loc.latitude,
+                  longitude: loc.longitude,
+                  isSharingLocation: true,
+                  ...(battery !== null ? { battery } : {}),
+                }).catch(() => {});
+              });
             }
           },
           (err) => {
@@ -684,11 +713,14 @@ export default function GroupDashboard() {
         const now = Date.now();
         if (now - lastWriteTimeRef.current > 9000) {
           lastWriteTimeRef.current = now;
-          updateGroupLocation(id, {
-            latitude: myLocation.latitude,
-            longitude: myLocation.longitude,
-            isSharingLocation: true,
-          }).catch(() => { });
+          getBatteryLevel().then((battery) => {
+            updateGroupLocation(id, {
+              latitude: myLocation.latitude,
+              longitude: myLocation.longitude,
+              isSharingLocation: true,
+              ...(battery !== null ? { battery } : {}),
+            }).catch(() => {});
+          });
         }
       }
     }, 10000);
@@ -1090,6 +1122,12 @@ export default function GroupDashboard() {
                   const isMemberAdmin = m.role === 'admin' || m.userId === group.adminId || m.user?.id === group.adminId || (!isGenericEmail(group.admin?.email) && m.user?.email === group.admin?.email);
                   const isCurrentAdminRow = isMemberAdmin;
 
+                  // Look up live battery from Presence data
+                  const presence = locations.find(l => l.userId === memberUserId);
+                  const battery = presence?.battery ?? null;
+                  const battColor = battery === null ? 'var(--gray-light)' : battery >= 40 ? '#34a853' : battery >= 20 ? '#fbbc04' : '#ea4335';
+                  const battIcon = battery === null ? '' : battery >= 40 ? '🔋' : battery >= 20 ? '🪫' : '🪫';
+
                   return (
                     <div key={memberId || memberUserId || idx} className="gd__member">
                       {m.user?.profileImage
@@ -1098,9 +1136,16 @@ export default function GroupDashboard() {
                       }
                       <div className="gd__member-info">
                         <span className="gd__member-name">{m.user?.name || 'Member'}</span>
-                        <span className={`badge badge-${isMemberAdmin ? 'yellow' : 'gray'}`} style={{ fontSize: '.6rem' }}>
-                          {isMemberAdmin ? '👑 Admin' : 'Member'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                          <span className={`badge badge-${isMemberAdmin ? 'yellow' : 'gray'}`} style={{ fontSize: '.6rem' }}>
+                            {isMemberAdmin ? '👑 Admin' : 'Member'}
+                          </span>
+                          {battery !== null && (
+                            <span style={{ fontSize: '.62rem', color: battColor, display: 'flex', alignItems: 'center', gap: 2, fontWeight: 600 }}>
+                              {battIcon} {battery}%
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {isAdmin && !isCurrentAdminRow && (
                         <button
