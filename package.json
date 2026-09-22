@@ -5,5 +5,8 @@
   "scripts": {
     "build": "cd pujoplan/client && npm install && npm run build",
     "start": "cd pujoplan/client && npm run preview"
+  },
+  "dependencies": {
+    "mongodb": "^7.6.0"
   }
 }

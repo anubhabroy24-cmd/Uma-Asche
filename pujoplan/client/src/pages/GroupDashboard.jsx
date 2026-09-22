@@ -60,13 +60,25 @@ function normalizeGroup(rawGroup) {
   const rawSpots = Array.isArray(rawGroup.spots) ? rawGroup.spots : [];
   const spots = rawSpots.map((s) => {
     const spotId = s.spotId || s.spot?.id || s.id;
-    let spotObj = (s.spot && s.spot.name) ? { ...s.spot } : (s.spot || {});
-    if (!spotObj.name || !spotObj.latitude) {
-      const found = findMatchingPandal(spotId, spotObj?.name || s?.name);
-      if (found) {
-        spotObj = { ...found, ...spotObj };
-      }
-    }
+    const dbSpotObj = s.spot || {};
+
+    // Always look up DEFAULT_PANDALS for reliable coords/name
+    const found = findMatchingPandal(spotId, dbSpotObj?.name || s?.name);
+
+    // Merge: found (DEFAULT_PANDALS) as base, DB overlays — but only use
+    // DB lat/lng if they are valid non-zero numbers
+    const dbLat = Number(dbSpotObj.latitude);
+    const dbLng = Number(dbSpotObj.longitude);
+    const hasValidDbCoords = isFinite(dbLat) && dbLat !== 0 && isFinite(dbLng) && dbLng !== 0;
+
+    let spotObj = {
+      ...(found || {}),
+      ...dbSpotObj,
+      latitude: hasValidDbCoords ? dbLat : (found?.latitude ?? dbSpotObj.latitude),
+      longitude: hasValidDbCoords ? dbLng : (found?.longitude ?? dbSpotObj.longitude),
+      name: (dbSpotObj.name && dbSpotObj.name !== 'Pandal Spot') ? dbSpotObj.name : (found?.name || dbSpotObj.name),
+    };
+
     return {
       ...s,
       id: s.id || `gs_${spotId}`,
@@ -558,18 +570,38 @@ export default function GroupDashboard() {
       const spotWps = (group.spots || [])
         .map((s, idx) => {
           const targetId = s.spotId || s.spot?.id || s.id;
-          const matched = (!s?.spot || !s.spot.latitude || !s.spot.name)
-            ? findMatchingPandal(targetId, s?.spot?.name || s?.name)
-            : null;
-          const sp = { ...(matched || {}), ...(s?.spot || {}) };
-          if (!sp.latitude || !sp.longitude) return null;
+
+          // Always try to find the pandal in DEFAULT_PANDALS for reliable coords
+          const matched = findMatchingPandal(targetId, s?.spot?.name || s?.name);
+
+          // Merge: DEFAULT_PANDALS as base, then overlay DB values — but only
+          // override lat/lng with DB values if they are valid finite numbers (not null/0)
+          const dbSpot = s?.spot || {};
+          const dbLat = Number(dbSpot.latitude);
+          const dbLng = Number(dbSpot.longitude);
+          const hasValidDbCoords = isFinite(dbLat) && dbLat !== 0 && isFinite(dbLng) && dbLng !== 0;
+
+          const sp = {
+            ...(matched || {}),
+            ...dbSpot,
+            // Restore matched coords when DB coords are missing/zero/null
+            latitude: hasValidDbCoords ? dbLat : (matched?.latitude ?? dbSpot.latitude),
+            longitude: hasValidDbCoords ? dbLng : (matched?.longitude ?? dbSpot.longitude),
+            // Always prefer a real name
+            name: (dbSpot.name && dbSpot.name !== 'Pandal Spot') ? dbSpot.name : (matched?.name || dbSpot.name),
+          };
+
+          const lat = Number(sp.latitude);
+          const lng = Number(sp.longitude);
+          if (!isFinite(lat) || lat === 0 || !isFinite(lng) || lng === 0) return null;
+
           return {
             id: s.id || `spot-${idx}`,
             groupSpotId: s.id,
             spotId: targetId,
-            name: sp.name || `Pandal ${idx + 1}`,
-            lat: Number(sp.latitude),
-            lng: Number(sp.longitude),
+            name: sp.name || matched?.name || `Pandal ${idx + 1}`,
+            lat,
+            lng,
           };
         })
         .filter(Boolean);
@@ -1317,11 +1349,13 @@ export default function GroupDashboard() {
 
 function SpotRow({ gs, isAdmin, uid, onVote, onRemove, onFinalize }) {
   const targetSpotId = gs?.spotId || gs?.id;
-  const matched = (!gs?.spot || !gs.spot.name) ? findMatchingPandal(targetSpotId, gs?.name) : null;
-  const spot = { ...(matched || {}), ...(gs?.spot || {}) };
-  const spotName = spot.name || gs?.name || matched?.name || 'Durga Puja Pandal';
-  const spotArea = spot.area || gs?.area || matched?.area || 'Kolkata';
-  const crowdLevel = spot.crowdLevel || gs?.crowdLevel || matched?.crowdLevel || 'Moderate';
+  // Always check DEFAULT_PANDALS for enriched display data
+  const matched = findMatchingPandal(targetSpotId, gs?.spot?.name || gs?.name);
+  const dbSpot = gs?.spot || {};
+  const spot = { ...(matched || {}), ...dbSpot };
+  const spotName = (dbSpot.name && dbSpot.name !== 'Pandal Spot') ? dbSpot.name : (matched?.name || gs?.name || 'Durga Puja Pandal');
+  const spotArea = (dbSpot.area || matched?.area || gs?.area || 'Kolkata');
+  const crowdLevel = (dbSpot.crowdLevel || matched?.crowdLevel || gs?.crowdLevel || 'Moderate');
   const crowdClr = CROWD_CLR[crowdLevel] || 'var(--gray-light)';
   const addedByName = gs?.addedBy?.name || 'Member';
 
