@@ -149,6 +149,10 @@ async function getMyGroups(req, res, next) {
         group.memberUids.push(uid);
         needsSave = true;
       }
+      if (!/^\d{8}$/.test(group.inviteToken || '')) {
+        group.inviteToken = generateInviteToken(group.id, group.name, group.adminId);
+        needsSave = true;
+      }
       if (needsSave) {
         group.save().catch(() => { });
       }

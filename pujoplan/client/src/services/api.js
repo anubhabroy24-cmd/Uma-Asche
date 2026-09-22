@@ -362,7 +362,6 @@ export const getSpotById = async (id) => {
 
 // ── Groups ────────────────────────────────────────────────────
 export const createGroup = async (data) => {
-  const user = getStoredUser();
   try {
     const res = await api.post('/groups', data);
     if (res.data) {
@@ -373,29 +372,9 @@ export const createGroup = async (data) => {
       return res;
     }
   } catch (err) {
-    console.warn('[API] createGroup API fallback:', err.message);
+    console.error('[API] createGroup failed:', err.message);
+    throw new Error('Group could not be saved to the server. Check your connection and try again.');
   }
-
-  const tempGroup = {
-    id: 'grp_' + Date.now(),
-    name: data.name,
-    region: data.region || 'Kolkata',
-    visitDate: data.visitDate,
-    startLocation: data.startLocation,
-    adminId: user.id,
-    createdAt: new Date().toISOString(),
-    admin: { id: user.id, name: user.name, email: user.email, profileImage: user.profileImage },
-    members: [{ id: 'mem_admin', userId: user.id, role: 'admin', user }],
-    spots: [],
-    _count: { members: 1, spots: 0 },
-    myRole: 'admin',
-  };
-  tempGroup.inviteToken = generatePortableInviteToken(tempGroup);
-  saveSharedGroup(tempGroup);
-  const groups = getLocalGroups();
-  groups.unshift(tempGroup);
-  saveLocalGroups(groups);
-  return { data: tempGroup };
 };
 
 export const getMyGroups = async () => {
@@ -470,7 +449,12 @@ export const getInviteInfo = async (token) => {
   try {
     const res = await api.get(`/groups/invite-info/${encodeURIComponent(cleanToken)}`);
     if (res.data) return res;
-  } catch (_) { }
+  } catch (err) {
+    // Numeric keys are server-owned and must never be accepted from local cache.
+    if (/^\d{8}$/.test(cleanToken)) {
+      throw new Error(err.response?.data?.error || 'This group code is not registered on the server.');
+    }
+  }
 
   const decoded = decodePortableInviteToken(cleanToken);
   if (decoded && decoded.id && decoded.name) {
@@ -531,6 +515,9 @@ export const joinGroup = async (token) => {
     }
   } catch (err) {
     console.warn('[API] joinGroup server error:', err.response?.data?.error || err.message);
+    if (/^\d{8}$/.test(cleanToken)) {
+      throw new Error(err.response?.data?.error || 'This group code is not registered on the server.');
+    }
   }
 
   // Portable token fallback
