@@ -54,12 +54,8 @@ public class CallNotificationHelper {
             );
             channel.setDescription("Incoming video and voice calls from your Puja group");
 
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                    .build();
-
-            channel.setSound(soundUri, audioAttributes);
+            // Audio is played exclusively by MediaPlayer on loop; keep channel silent to avoid double ringing
+            channel.setSound(null, null);
             channel.enableVibration(true);
             channel.setVibrationPattern(new long[]{0, 800, 400, 800, 400, 800});
             channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
@@ -122,7 +118,7 @@ public class CallNotificationHelper {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setOngoing(true)
                 .setAutoCancel(false)
-                .setSound(soundUri, AudioManager.STREAM_RING)
+                .setSilent(true)
                 .setVibrate(new long[]{0, 800, 400, 800, 400, 800})
                 .setFullScreenIntent(fullScreenPendingIntent, true)
                 .setContentIntent(fullScreenPendingIntent)

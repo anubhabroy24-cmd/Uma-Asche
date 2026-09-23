@@ -93,7 +93,7 @@ export default function IncomingCallOverlay() {
       title: `Incoming ${modeLabel}`,
       body: `${caller.name || 'Group member'} is calling in "${callData.groupName || 'your group'}". Tap to answer!`,
       id: (Date.now() % 100000),
-      sound: 'default',
+      sound: null,
     });
   }, [user, isSelf, location.pathname, location.search]);
 

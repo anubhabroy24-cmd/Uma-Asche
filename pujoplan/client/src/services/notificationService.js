@@ -60,7 +60,7 @@ export async function showMobileNotification({
   id = Date.now() % 100000,
   extra = {},
   iconColor = '#ea4335',
-  sound = 'default',
+  sound = null,
   channelId = 'call_channel',
 }) {
   try {
