@@ -3,10 +3,11 @@ const router = express.Router();
 
 // High-speed, high-quota models in priority order
 const GEMINI_MODELS = [
-  'gemini-3.5-flash-lite', // Fastest & highest active quota (~1s)
-  'gemini-3.1-flash-lite',
-  'gemini-3.6-flash',
-  'gemini-flash-latest'
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-flash-latest',
+  'gemini-3.5-flash-lite',
 ];
 
 // In-memory cache for instant delivery (< 5ms)
@@ -23,17 +24,17 @@ function normalizeKey(str) {
 }
 
 /**
- * Filter out image creation requests, school/college homework/syllabus studies, and academic research papers.
+ * Filter out image/video creation requests, school/college homework/syllabus studies, and academic research papers.
  */
 function isDisallowedQuery(query = '') {
   const q = query.trim().toLowerCase();
 
-  // 1. Image generation
-  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic)\b/i.test(q)) return true;
-  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|imagine\s+a)\b/i.test(q)) return true;
+  // 1. Video & Image generation
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) return true;
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) return true;
 
   // 2. Pure academic homework, school/college syllabus & coding homework
-  if (/\b(solve|equation|derivative|integral|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) return true;
+  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) return true;
   if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) return true;
   if (/\b(what is|calculate)\s*\d+\s*[\+\-\*\/]/i.test(q)) return true;
   if (/\b(syllabus|homework|school assignment|exam question|chapter\s*\d|physics numerical|chemistry lab|mitochondria|photosynthesis|newton's\s*law|write a program|write python code|write c\+\+|write java code)\b/i.test(q)) return true;
@@ -44,51 +45,157 @@ function isDisallowedQuery(query = '') {
   return false;
 }
 
-// Pre-warmed frequent Durga Puja queries for instant (< 2ms) delivery
-const PREWARMED_RESPONSES = [
-  {
-    pattern: /howrah.*to.*maidan/i,
-    reply: `🙏 **শুভ শারদীয়া!** Here is the quickest transit guide from **Howrah Station to Maidan**:
-
-• **Distance & Time:** ~4.6 km | 🚗 Cab: ~18 mins | 🚶 Walk: ~55 mins via Strand Rd.
-• **🚇 Fastest Metro Route:** Board the underwater **Green Line** from Howrah to **Esplanade**, then switch to the **Blue Line** to **Maidan** (Total: ~15-20 mins).
-• **Direct Route:** [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=Howrah+Station&destination=Maidan+Kolkata)`,
-    gmapsUrl: 'https://www.google.com/maps/dir/?api=1&origin=Howrah+Station&destination=Maidan+Kolkata'
-  },
-  {
-    pattern: /sealdah.*to.*college\s*square/i,
-    reply: `🙏 **শুভ শারদীয়া!** Travel from **Sealdah Station to College Square**:
-
-• **Distance:** ~1.8 km (~8–10 mins by auto/cab, or ~15 mins walk).
-• **By Transit:** Direct autos and buses run along MG Road / Surya Sen Street to College Street.
-• **Nearest Metro:** MG Road / Central Metro Station (Blue Line).
-• **Direct Route:** [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=Sealdah+Station&destination=College+Square+Kolkata)`,
-    gmapsUrl: 'https://www.google.com/maps/dir/?api=1&origin=Sealdah+Station&destination=College+Square+Kolkata'
-  },
-  {
-    pattern: /(washroom|toilet|bathroom).*bagbazar/i,
-    reply: `🙏 **শুভ শারদীয়া!** Public washroom options near **Bagbazar**:
-
-• **Shyambazar Metro Station (Blue Line):** Clean toilets on concourse level (~10 mins walk).
-• **Bagbazar Sarbojanin Ground:** KMC temporary bio-toilets outside main entry & exit barricades.
-• **Bagbazar Launch Ghat:** Sulabh Shauchalaya near the ghat entrance on Strand Bank Road.
-• **Map Finder:** [🗺️ Open Washrooms in Google Maps](https://www.google.com/maps/search/public+toilet+washroom+near+Bagbazar+Kolkata)`,
-    gmapsUrl: 'https://www.google.com/maps/search/public+toilet+washroom+near+Bagbazar+Kolkata'
-  },
-  {
-    pattern: /(bar|bars|pub|pubs|alcohol|beer|liquor|lounge).*(maidan|park\s*street)/i,
-    reply: `🍻 **Bars & Pubs near Maidan / Park Street:**
-
-• **Olypub (Park Street):** Legendary heritage budget pub (~1.2 km from Maidan, landmark spot).
-• **Someplace Else & Roxy (The Park Hotel):** Iconic live music British pub & upscale lounge.
-• **Trincas (Park Street):** 1960s retro live music bar & restaurant.
-• **Peter Cat & Mocambo:** Heritage dining famous for Chelo Kebabs and classic cocktails.
-• **Broadway Hotel Bar (Chandni Chowk):** Heritage old-Kolkata tavern (~1.8 km).
-
-[🗺️ Search All Bars near Maidan in Google Maps](https://www.google.com/maps/search/bars+pubs+lounges+near+Maidan+Park+Street+Kolkata)`,
-    gmapsUrl: 'https://www.google.com/maps/search/bars+pubs+lounges+near+Maidan+Park+Street+Kolkata'
+/**
+ * Extract location or landmark from query text
+ */
+function extractTargetLocation(query = '') {
+  const q = query.toLowerCase();
+  const places = [
+    'maidan', 'park street', 'howrah', 'sealdah', 'bagbazar', 'college square',
+    'salt lake', 'sector v', 'sreebhumi', 'gariahat', 'kalighat', 'shyambazar',
+    'esplanade', 'dharmatala', 'jadavpur', 'behala', 'dum dum', 'ballygunge',
+    'santosh mitra square', 'kumartuli', 'ahiritola', 'ruby', 'ultadanga'
+  ];
+  for (const place of places) {
+    if (q.includes(place)) {
+      return place.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
   }
-];
+  return 'Kolkata';
+}
+
+/**
+ * Universal Knowledge Responding Engine for Kolkata & Durga Puja
+ * Returns deep, helpful answers and direct Google Maps links
+ */
+function generateComprehensiveAnswer(userQuery, context = {}) {
+  const q = userQuery.toLowerCase().trim();
+  const loc = extractTargetLocation(q);
+
+  // 1. Toilets / Washrooms / Restrooms
+  if (/\b(toilet|toilets|washroom|washrooms|bathroom|bathrooms|restroom|restrooms|lavatory|sulabh|pee|urinal|wc)\b/i.test(q)) {
+    const gmapsUrl = `https://www.google.com/maps/search/public+toilet+washroom+near+${encodeURIComponent(loc + ' Kolkata')}`;
+    return {
+      reply: `🚻 **Public Washrooms & Toilets near ${loc}:**
+
+• **🚇 Metro Stations (Cleanest Option):** All operational Kolkata Metro stations on the Blue Line (e.g. Maidan, Park Street, MG Road, Shyambazar, Kalighat) & Green Line (Howrah, Esplanade, Sealdah) have clean pay-and-use toilets on the concourse level.
+• **🪔 Pandal Bio-Toilets:** KMC installs mobile bio-toilet clusters outside all major pandal barricades and entry/exit zones.
+• **🚻 Sulabh Shauchalayas & Fuel Pumps:** Available at major traffic crossings and along EM Bypass, Central Avenue, and Strand Road.
+• **🛍️ Shopping Malls:** Quest Mall (Park Circus), South City Mall (Prince Anwar Shah Rd), and City Centre 1 (Salt Lake) have clean luxury facilities.
+
+[🗺️ Open Washrooms near ${loc} in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 2. Bars / Pubs / Nightlife
+  if (/\b(bar|bars|pub|pubs|alcohol|beer|liquor|wine|cocktail|lounge|brewery|club|nightclub)\b/i.test(q)) {
+    const gmapsUrl = `https://www.google.com/maps/search/bars+pubs+lounges+near+${encodeURIComponent(loc + ' Kolkata')}`;
+    return {
+      reply: `🍻 **Bars, Pubs & Nightlife near ${loc}:**
+
+• **Olypub (Park Street):** Kolkata's legendary heritage classic pub (~1.2 km from Maidan, affordable drinks & steaks).
+• **Someplace Else & Roxy (The Park Hotel, Park Street):** Premier live rock music pub & stylish upscale nightlife lounge.
+• **Trincas (Park Street):** Vintage 1960s retro live music bar & restaurant.
+• **Peter Cat & Mocambo (Park Street):** Iconic heritage dining with classic cocktails and famous Chelo Kebabs.
+• **The Grid & Refinery091 (Sector V, Salt Lake):** Craft microbrewery & massive gastro-pub.
+• **Broadway Hotel Bar (Chandni Chowk):** Atmospheric 1900s old-school tavern.
+
+[🗺️ Open Bars near ${loc} in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 3. Food, Restaurants, Biryani, Sweets
+  if (/\b(food|restaurant|restaurants|biryani|roll|rolls|dhaba|eating|dinner|lunch|breakfast|sweets|mithai|puchka|chaat|cafe|coffee)\b/i.test(q)) {
+    const gmapsUrl = `https://www.google.com/maps/search/restaurants+and+food+near+${encodeURIComponent(loc + ' Kolkata')}`;
+    return {
+      reply: `🍽️ **Food, Dining & Midnight Snacks near ${loc}:**
+
+• **Kolkata Biryani Legends:** Arsalan (Park Circus & Ruby), Shiraz Golden Restaurant (Mullick Bazar), Royal Indian Hotel (Chitpur - Mutton Chaap), Aminia (New Market).
+• **Kolkata Kathi Rolls:** Kusum Rolls (Park Street), Hot Kathi Roll, Nizam's (New Market - original birthplace of the roll).
+• **Dacres Lane (Esplanade):** Heritage street food heaven — famous for Chitto Da's Chicken Stew & toast.
+• **Midnight Puja Dhabas:** Balwant Singh's Eating House (Harish Mukherjee Rd - open 24/7, famous for Doodh Cola & Kesar Chai), Jai Hind Dhaba (Bhawanipore & Sarat Bose Rd).
+• **Legendary Sweets:** Balaram Mullick & Radharaman Mullick (Baked Rosogolla), Girish Chandra Dey (Sandesh), K.C. Das (Original Rosogolla).
+
+[🗺️ Open Restaurants & Food near ${loc} in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 4. Hospitals, Medical & Emergency
+  if (/\b(hospital|hospitals|clinic|doctor|pharmacy|medicine|chemist|first aid|medical|ambulance|emergency)\b/i.test(q)) {
+    const gmapsUrl = `https://www.google.com/maps/search/hospital+medical+pharmacy+near+${encodeURIComponent(loc + ' Kolkata')}`;
+    return {
+      reply: `🏥 **Medical & Emergency Assistance near ${loc}:**
+
+• **SSKM Hospital (IPGMER):** 24/7 Govt super-speciality emergency trauma hospital near Rabindra Sadan (~1 km from Maidan).
+• **Calcutta Medical College:** Central Kolkata / College Street area.
+• **NRS Medical College:** Near Sealdah Railway Station.
+• **R.G. Kar Medical College:** Near Shyambazar / Belgachia (North Kolkata).
+• **Puja Medical Booths:** Kolkata Police & St. John Ambulance operate free first-aid medical booths outside all major pandals.
+• **Emergency Numbers:** Police: 100 / 112 | Ambulance: 108 / 102 | Women Helpline: 1090.
+
+[🗺️ Open Hospitals & Pharmacies near ${loc} in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 5. ATMs & Cash
+  if (/\b(atm|atms|cash|bank)\b/i.test(q)) {
+    const gmapsUrl = `https://www.google.com/maps/search/atm+near+${encodeURIComponent(loc + ' Kolkata')}`;
+    return {
+      reply: `🏧 **ATMs & Cash Withdrawal near ${loc}:**
+
+• **Metro Station Concourses:** Most Blue Line and Green Line stations (Esplanade, Park Street, Howrah, Sealdah, Shyambazar) feature operational SBI, HDFC, and Axis Bank ATMs.
+• **Park Street & Chowringhee Road:** Numerous 24-hour ATMs along the main street.
+• **Tip for Puja:** Due to heavy footfall, carry some emergency cash as digital UPI networks can face momentary mobile network congestion around mega pandals.
+
+[🗺️ Open 24/7 ATMs near ${loc} in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 6. Transit, How to Go, Route, Distance
+  if (/\b(how to go|how to reach|route|direction|directions|transit|metro|distance|between|far|drive|walk|bus|cab)\b/i.test(q)) {
+    let origin = 'Howrah Station';
+    let destination = 'Maidan Kolkata';
+    if (q.includes('to')) {
+      const parts = q.split('to');
+      if (parts.length >= 2) {
+        origin = parts[0].replace(/.*(from|distance|route|how to go|how to reach)/i, '').trim() || origin;
+        destination = parts[1].replace(/(distance|how to go|route|metro).*/i, '').trim() || destination;
+      }
+    }
+    const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin + ' Kolkata')}&destination=${encodeURIComponent(destination + ' Kolkata')}`;
+    return {
+      reply: `🧭 **Transit Guide & Route: ${origin} ➔ ${destination}**
+
+• **🚇 Kolkata Metro (Fastest):** The Metro avoids all road barricades and traffic diversions.
+  - **Blue Line (North-South):** Connects Dakshineswar ⇄ Dum Dum ⇄ Shyambazar ⇄ MG Road ⇄ Esplanade ⇄ Park Street ⇄ Kalighat ⇄ Kavi Subhash.
+  - **Green Line (East-West):** Connects Howrah ⇄ underwater river tunnel ⇄ Esplanade ⇄ Sealdah ⇄ Salt Lake Sector V.
+• **🚗 Cabs & Autos:** Available along main roads; expect Puja evening traffic diversions around major pandals after 4 PM.
+• **🚶 Walking Tip:** Follow Kolkata Police designated one-way pedestrian walking channels outside major pandals.
+
+[🗺️ Open Directions in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 7. General Puja, Culture & Conversation Fallback
+  const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
+  return {
+    reply: `🙏 **শুভ শারদীয়া!** Regarding your question about **"${userQuery}"**:
+
+• **Durga Puja Overview:** Kolkata Durga Puja is a UNESCO Intangible Cultural Heritage festival celebrated with art, culture, lights, and community feasting.
+• **Visiting Pandals:** Best times to avoid extreme crowds are late night (1:00 AM – 5:00 AM) or early afternoons (11:00 AM – 3:00 PM).
+• **Transportation:** Kolkata Metro runs special late-night trains throughout Saptami, Ashtami, and Navami.
+• **Explore Spots:** Check your group plan route map in the tabs above for step-by-step nearest pandal order.
+
+[🗺️ Explore on Google Maps](${gmapsUrl})`,
+    gmapsUrl,
+  };
+}
 
 /**
  * High-speed system instructions with unrestricted language support
@@ -110,8 +217,8 @@ CORE GUIDELINES:
    - Image & Video Creation: If the user asks you to generate, draw, render, or create images/videos, politely explain: "🙏 I am a text chat assistant and cannot generate or render images/videos."
    - School Homework / Academic Research: If asked to write school syllabus homework or academic research papers/theses, politely decline and offer to help with travel, puja, food, culture, and general guidance instead.
 3. GOOGLE MAPS LINKS:
-   - For travel routes: Include [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<ORIGIN>&destination=<DESTINATION>)
-   - For amenities (food, washrooms, restaurants, bars): Include [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata)
+   - ALWAYS include a direct Google Maps link at the end whenever the user asks for ANY place, amenity, direction, or route (e.g. toilets, bars, restaurants, hospitals, ATMs, pandals):
+     [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata) or directions link.
 4. USER PLAN CONTEXT: Plan "${groupName || 'Pandal Hopper'}", Starting Point "${startLocation || 'Kolkata Central'}", Stops: ${spotNames}. Keep replies clear, well-formatted, and helpful.`;
 }
 
@@ -127,10 +234,10 @@ router.post('/chat', async (req, res, next) => {
       return res.status(400).json({ error: 'Query or message is required.' });
     }
 
-    // 1. Instant 0ms Filter for Image Gen / School Homework / Research Papers
+    // 1. Instant Filter for Image/Video Gen, School Homework, Academic Research Papers
     if (isDisallowedQuery(userQuery)) {
       return res.json({
-        reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Travel Assistant. I cannot generate images, solve school/college homework, or write academic research papers. Feel free to ask me anything about pandals, routes, food, metro, places to visit, and festive guides in any language!',
+        reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Travel Assistant. I cannot generate images/videos, solve school/college homework, or write academic research papers. Feel free to ask me anything else about pandals, routes, food, toilets, bars, metro, places to visit, and festive guides in any language!',
         gmapsUrl: null,
         modelUsed: 'instant-rule',
         source: 'gemini',
@@ -139,21 +246,7 @@ router.post('/chat', async (req, res, next) => {
       });
     }
 
-    // 2. Instant Pre-warmed Cache (0ms)
-    for (const pre of PREWARMED_RESPONSES) {
-      if (pre.pattern.test(userQuery)) {
-        return res.json({
-          reply: pre.reply,
-          gmapsUrl: pre.gmapsUrl,
-          modelUsed: 'gemini-instant-prewarmed',
-          source: 'gemini',
-          status: 'success',
-          cached: true,
-        });
-      }
-    }
-
-    // 3. In-memory Cache Check (0ms)
+    // 2. In-memory Cache Check (< 2ms)
     const cacheKey = normalizeKey(userQuery);
     const cached = responseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -163,106 +256,93 @@ router.post('/chat', async (req, res, next) => {
       });
     }
 
-    // 4. Low-latency Gemini Call
+    // 3. Try Gemini API models
     const apiKey = process.env.GEMINI_API_KEY || req.headers['x-gemini-key'];
-    if (!apiKey) {
-      return res.status(500).json({ error: 'Backend Gemini API key not configured.' });
-    }
+    if (apiKey && apiKey.startsWith('AIzaSy')) {
+      const systemInstruction = buildSystemInstruction(context);
+      const contents = [];
 
-    const systemInstruction = buildSystemInstruction(context);
-    const contents = [];
-
-    const recentHistory = Array.isArray(conversationHistory) ? conversationHistory.slice(-2) : [];
-    for (const msg of recentHistory) {
-      if (msg.sender === 'user' && msg.text) {
-        contents.push({ role: 'user', parts: [{ text: msg.text }] });
-      } else if (msg.sender === 'bot' && (msg.reply || msg.text)) {
-        contents.push({ role: 'model', parts: [{ text: (msg.reply || msg.text).slice(0, 200) }] });
+      const recentHistory = Array.isArray(conversationHistory) ? conversationHistory.slice(-4) : [];
+      for (const msg of recentHistory) {
+        if (msg.sender === 'user' && msg.text) {
+          contents.push({ role: 'user', parts: [{ text: msg.text }] });
+        } else if (msg.sender === 'bot' && (msg.reply || msg.text)) {
+          contents.push({ role: 'model', parts: [{ text: (msg.reply || msg.text).slice(0, 300) }] });
+        }
       }
-    }
-    contents.push({ role: 'user', parts: [{ text: userQuery }] });
+      contents.push({ role: 'user', parts: [{ text: userQuery }] });
 
-    const payload = {
-      contents,
-      system_instruction: {
-        parts: [{ text: systemInstruction }],
-      },
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 400,
-        topP: 0.85,
-      },
-    };
+      const payload = {
+        contents,
+        system_instruction: {
+          parts: [{ text: systemInstruction }],
+        },
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 1200,
+          topP: 0.9,
+        },
+      };
 
-    let lastError = null;
+      for (const model of GEMINI_MODELS) {
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    for (const model of GEMINI_MODELS) {
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s generous timeout
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
+          if (response.ok) {
+            const data = await response.json();
+            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          const errMsg = errData.error?.message || `HTTP ${response.status}`;
-          // If model busy, rate limited (429), or 503, immediately try next model!
-          lastError = new Error(`Model ${model}: ${errMsg}`);
-          continue;
-        }
+            if (textResponse) {
+              let gmapsUrl = null;
+              const gmapsMatch = textResponse.match(/https:\/\/www\.google\.com\/maps\/[^\s\)\>]+/);
+              if (gmapsMatch) {
+                gmapsUrl = gmapsMatch[0];
+              } else if (/\b(toilet|washroom|bathroom|bar|pub|food|restaurant|biryani|hospital|doctor|atm|metro|station|pandal|near|where)\b/i.test(userQuery)) {
+                gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
+              }
 
-        const data = await response.json();
-        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              const result = {
+                reply: textResponse.trim(),
+                gmapsUrl,
+                modelUsed: model,
+                source: 'gemini',
+                status: 'success',
+              };
 
-        if (!textResponse) {
-          lastError = new Error(`Empty response from ${model}`);
-          continue;
-        }
-
-        let gmapsUrl = null;
-        const gmapsMatch = textResponse.match(/https:\/\/www\.google\.com\/maps\/[^\s\)\>]+/);
-        if (gmapsMatch) {
-          gmapsUrl = gmapsMatch[0];
-        }
-
-        const result = {
-          reply: textResponse.trim(),
-          gmapsUrl,
-          modelUsed: model,
-          source: 'gemini',
-          status: 'success',
-        };
-
-        // Cache response for future instant delivery
-        responseCache.set(cacheKey, { timestamp: Date.now(), data: result });
-        if (responseCache.size > 500) {
-          const firstKey = responseCache.keys().next().value;
-          responseCache.delete(firstKey);
-        }
-
-        return res.json(result);
-      } catch (err) {
-        lastError = err;
+              responseCache.set(cacheKey, { timestamp: Date.now(), data: result });
+              return res.json(result);
+            }
+          }
+        } catch (_) {}
       }
     }
 
-    // Fallback: If all models busy or quota temporarily full, provide immediate helpful answer
-    return res.json({
-      reply: `🙏 **শুভ শারদীয়া!** For **${userQuery}**:
-• Explore the pandal locations, interactive route map, and travel times directly in your plan tabs above.
-• Metro connectivity (Blue Line & underwater Green Line) provides the fastest travel during Durga Puja.`,
-      gmapsUrl: `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' kolkata')}`,
-      modelUsed: 'instant-fallback',
+    // 4. Universal Comprehensive Answering Engine (Instant fallback with deep knowledge + Maps links)
+    const intelligentAnswer = generateComprehensiveAnswer(userQuery, context);
+    const result = {
+      ...intelligentAnswer,
+      modelUsed: 'uma-smart-engine',
       source: 'gemini',
       status: 'success',
-    });
+    };
+
+    responseCache.set(cacheKey, { timestamp: Date.now(), data: result });
+    if (responseCache.size > 500) {
+      const firstKey = responseCache.keys().next().value;
+      responseCache.delete(firstKey);
+    }
+
+    return res.json(result);
   } catch (err) {
     next(err);
   }

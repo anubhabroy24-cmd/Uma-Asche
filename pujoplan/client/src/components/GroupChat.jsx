@@ -7,9 +7,25 @@ import {
   Send, MessageSquare, AlertCircle, Phone, PhoneOff,
   Mic, MicOff, Volume2, Users, Radio, Video, VideoOff,
   Maximize2, Minimize2, Image as ImageIcon, X, ZoomIn,
-  ChevronDown, ShieldCheck
+  ChevronDown, ShieldCheck, Download
 } from 'lucide-react';
 import './GroupChat.css';
+
+// Helper to save/download an image to device
+function handleDownloadImage(dataUrl, filename = 'pujo-chat-photo.jpg') {
+  if (!dataUrl) return;
+  try {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = filename || `pujo_photo_${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    console.warn('Failed to save image:', err);
+    window.open(dataUrl, '_blank');
+  }
+}
 
 function formatMessageTime(dateStr) {
   if (!dateStr) return '';
@@ -94,11 +110,15 @@ function getMsgSender(msg, currentUser, isMe) {
   return { name, profileImage };
 }
 
-// Compress selected photo before upload to keep chat fast and responsive
+// Compress selected photo before upload to keep chat fast and ensure strictly under 1MB
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       return reject(new Error('Please select an image file.'));
+    }
+    const ONE_MB = 1024 * 1024;
+    if (file.size > ONE_MB) {
+      return reject(new Error('Picture must be under 1 MB in size.'));
     }
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -123,7 +143,14 @@ function compressImage(file) {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+          let quality = 0.82;
+          let dataUrl = canvas.toDataURL('image/jpeg', quality);
+          // If still over 1MB, progressively compress until under 1MB
+          while (dataUrl.length > ONE_MB * 1.33 && quality > 0.25) {
+            quality -= 0.15;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
           resolve(dataUrl);
         } catch (err) {
           reject(err);
@@ -401,6 +428,16 @@ export default function GroupChat({ groupId, currentUser }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Must be under 1 MB
+    const ONE_MB = 1024 * 1024;
+    if (file.size > ONE_MB) {
+      alert('Picture must be under 1 MB in size. Please select a smaller photo.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     try {
       setUploadingPhoto(true);
       setError('');
@@ -411,7 +448,8 @@ export default function GroupChat({ groupId, currentUser }) {
       });
     } catch (err) {
       console.warn('Image processing error:', err);
-      setError(err.message || 'Failed to attach image.');
+      setError(err.message || 'Failed to attach image. Please ensure it is under 1MB.');
+      alert(err.message || 'Picture must be under 1 MB.');
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) {
@@ -631,19 +669,41 @@ export default function GroupChat({ groupId, currentUser }) {
                   {!isMe && <span className="gc__sender-name">{sender.name}</span>}
 
                   {msg.imageUrl && (
-                    <div
-                      className="gc__bubble-img-wrap"
-                      onClick={() => setPreviewPhotoModal(msg.imageUrl)}
-                      title="Click to zoom photo"
-                    >
+                    <div className="gc__bubble-img-wrap">
                       <img
                         src={msg.imageUrl}
                         alt="Shared in group"
                         className="gc__bubble-img"
                         loading="lazy"
+                        onClick={() => setPreviewPhotoModal(msg.imageUrl)}
+                        title="Click to enlarge photo"
                       />
-                      <div className="gc__bubble-img-hover">
-                        <ZoomIn size={16} />
+                      <div className="gc__bubble-img-actions">
+                        <button
+                          type="button"
+                          className="gc__img-action-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewPhotoModal(msg.imageUrl);
+                          }}
+                          title="Zoom photo"
+                          aria-label="Zoom photo"
+                        >
+                          <ZoomIn size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          className="gc__img-action-btn gc__img-action-btn--save"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadImage(msg.imageUrl, `pujo_photo_${msg.id || Date.now()}.jpg`);
+                          }}
+                          title="Save photo to device"
+                          aria-label="Save photo"
+                        >
+                          <Download size={13} />
+                          <span style={{ fontSize: '11px', fontWeight: 600 }}>Save</span>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -731,14 +791,26 @@ export default function GroupChat({ groupId, currentUser }) {
       {previewPhotoModal && (
         <div className="gc__lightbox-overlay" onClick={() => setPreviewPhotoModal(null)}>
           <div className="gc__lightbox-content" onClick={e => e.stopPropagation()}>
-            <button
-              type="button"
-              className="gc__lightbox-close"
-              onClick={() => setPreviewPhotoModal(null)}
-              aria-label="Close enlarged photo"
-            >
-              <X size={20} />
-            </button>
+            <div className="gc__lightbox-toolbar">
+              <button
+                type="button"
+                className="gc__lightbox-save-btn"
+                onClick={() => handleDownloadImage(previewPhotoModal, `pujo_photo_${Date.now()}.jpg`)}
+                title="Save picture to device"
+              >
+                <Download size={15} />
+                <span>Save Picture</span>
+              </button>
+              <button
+                type="button"
+                className="gc__lightbox-close"
+                onClick={() => setPreviewPhotoModal(null)}
+                aria-label="Close enlarged photo"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
             <img src={previewPhotoModal} alt="Shared in chat" className="gc__lightbox-img" />
           </div>
         </div>

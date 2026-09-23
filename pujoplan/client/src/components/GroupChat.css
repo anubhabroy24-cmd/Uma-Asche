@@ -1140,6 +1140,46 @@
   opacity: 1;
 }
 
+.gc__bubble-img-actions {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.gc__img-action-btn {
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(4px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gc__img-action-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.gc__img-action-btn--save {
+  background: rgba(16, 185, 129, 0.88);
+  border-color: rgba(16, 185, 129, 0.95);
+}
+
+.gc__img-action-btn--save:hover {
+  background: #10b981;
+}
+
 /* ── Lightbox Overlay ────────────── */
 .gc__lightbox-overlay {
   position: fixed;
@@ -1181,10 +1221,38 @@
   object-fit: contain;
 }
 
-.gc__lightbox-close {
+.gc__lightbox-toolbar {
   position: absolute;
-  top: -40px;
+  top: -46px;
   right: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 3;
+}
+
+.gc__lightbox-save-btn {
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s ease;
+}
+
+.gc__lightbox-save-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.gc__lightbox-close {
   background: rgba(255, 255, 255, 0.15);
   color: var(--white);
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -1200,4 +1268,4 @@
 
 .gc__lightbox-close:hover {
   background: rgba(234, 67, 53, 0.8);
-}
+}

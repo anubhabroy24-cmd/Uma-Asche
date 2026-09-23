@@ -994,3 +994,18 @@
   margin-bottom: 6px;
   font-weight: 700;
 }
+
+.distbot-inline-link {
+  color: #60a5fa;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: color 0.15s ease;
+}
+
+.distbot-inline-link:hover {
+  color: #93c5fd;
+}

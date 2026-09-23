@@ -41,11 +41,11 @@ export function isDisallowedQuery(query) {
   if (!query) return false;
   const q = query.trim().toLowerCase();
 
-  // 1. Image generation requests
-  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic)\b/i.test(q)) {
+  // 1. Video & Image generation requests
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) {
     return true;
   }
-  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|imagine\s+a)\b/i.test(q)) {
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) {
     return true;
   }
 
@@ -440,7 +440,29 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // 6. Fallback search by keyword
+  // 6. ATM & Cash Search
+  const isAtm = /\b(atm|atms|cash|bank)\b/i.test(text);
+  if (isAtm) {
+    const ref = entities[0] || { name: 'Kolkata', lat: 22.5726, lng: 88.3639 };
+    const gmapsUrl = `https://www.google.com/maps/search/atm+near+${encodeURIComponent(ref.name + ' Kolkata')}`;
+    return {
+      type: 'amenity_card',
+      amenityType: 'atm',
+      gmapsUrl,
+      reply: `🏧 **ATMs & Cash Withdrawal near ${ref.name}:**\n\n` +
+        `• **Metro Station Concourses:** Major Blue Line and Green Line stations (Esplanade, Park Street, Howrah, Sealdah, Shyambazar) feature operational SBI, HDFC, and Axis Bank ATMs.\n` +
+        `• **Commercial Hubs:** Park Street, Chowringhee Rd, and Gariahat have multiple 24/7 ATM kiosks.\n` +
+        `• **Puja Tip:** Keep some cash handy in case mobile digital UPI networks experience local congestion around mega pandals.\n\n` +
+        `[🗺️ Search 24/7 ATMs near ${ref.name} on Google Maps](${gmapsUrl})`,
+      suggestions: [
+        'Find bathrooms near me',
+        `Food near ${ref.name}`,
+        'Pandals near my GPS location',
+      ],
+    };
+  }
+
+  // 7. Fallback search by keyword
   const keywordMatches = DEFAULT_PANDALS.filter(p => {
     const q = text;
     return (
@@ -453,27 +475,27 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
   if (keywordMatches.length > 0) {
     return {
       type: 'pandal_matches',
-      reply: `Did you mean one of these pandals?`,
+      reply: `Found matching pandals in Kolkata:`,
       matches: keywordMatches,
       suggestions: keywordMatches.map(m => `Distance to ${m.name}`),
     };
   }
 
-  // Fallback helpful guidance strictly focused on Puja plans and routes
+  // 8. Universal Helpful Response for ANY question with direct Google Maps link
+  const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
   return {
-    type: 'help',
-    reply: `🙏 I couldn't identify those locations in Kolkata. Please ask about Puja pandals, routes, or distances!`,
-    details: [
-      'Example questions:',
-      '• "Howrah to Maidan distance how to go"',
-      '• "Distance between Bagbazar and College Square"',
-      '• "Find bathrooms near me"',
-      '• "Pandals near Salt Lake"',
-    ],
+    type: 'general_info',
+    reply: `🙏 **শুভ শারদীয়া!** Regarding **"${userQuery}"**:\n\n` +
+      `• **Kolkata Puja Guide:** You can explore pandals, distances, travel times, and live transit anytime.\n` +
+      `• **Metro Tip:** The Kolkata Metro (Blue & underwater Green Line) is the fastest way to travel during Durga Puja.\n` +
+      `• **Plan Section:** Check your group plan route map in the tabs above for step-by-step nearest pandal order.\n\n` +
+      `[🗺️ Open in Google Maps](${gmapsUrl})`,
+    gmapsUrl,
     suggestions: [
-      'Howrah to Maidan distance',
       'Find bathrooms near me',
-      'Distance: Bagbazar to College Square',
+      'Nearest bars and pubs',
+      'Howrah to Maidan distance',
+      'Famous pandals in South Kolkata',
     ],
   };
 }

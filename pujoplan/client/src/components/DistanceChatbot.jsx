@@ -19,6 +19,63 @@ const INITIAL_MESSAGES = [
   },
 ];
 
+// Helper to parse markdown links [text](url) and bold **text** into clickable elements
+function renderFormattedReply(text) {
+  if (!text) return null;
+  const lines = text.split('\n');
+
+  return lines.map((line, lineIdx) => {
+    if (!line.trim()) {
+      return <div key={lineIdx} style={{ height: 6 }} />;
+    }
+
+    const tokens = [];
+    const regex = /\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)|\*\*([^*]+)\*\*/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        tokens.push(line.slice(lastIndex, match.index));
+      }
+      if (match[1] && match[2]) {
+        tokens.push(
+          <a
+            key={`lnk-${match.index}`}
+            href={match[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="distbot-inline-link"
+          >
+            {match[1]} <ExternalLink size={12} style={{ display: 'inline', verticalAlign: 'middle', marginLeft: 2 }} />
+          </a>
+        );
+      } else if (match[3]) {
+        tokens.push(<strong key={`b-${match.index}`}>{match[3]}</strong>);
+      }
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < line.length) {
+      tokens.push(line.slice(lastIndex));
+    }
+
+    const isBullet = line.trim().startsWith('•') || line.trim().startsWith('-');
+    return (
+      <p
+        key={lineIdx}
+        style={{
+          margin: isBullet ? '3px 0' : '5px 0',
+          paddingLeft: isBullet ? '4px' : '0',
+          lineHeight: '1.48',
+        }}
+      >
+        {tokens}
+      </p>
+    );
+  });
+}
+
 export default function DistanceChatbot({
   defaultOpen = false,
   embedded = false,
@@ -324,8 +381,8 @@ export default function DistanceChatbot({
                     )}
 
                     {/* Bot Title / Reply */}
-                    <div className="distbot-msg__text" style={{ whiteSpace: 'pre-wrap' }}>
-                      <p>{m.reply}</p>
+                    <div className="distbot-msg__text">
+                      {renderFormattedReply(m.reply)}
                     </div>
 
                     {/* Direct Google Maps Link Button */}
@@ -336,10 +393,23 @@ export default function DistanceChatbot({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="distbot-action-btn distbot-action-btn--gmaps"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            textDecoration: 'none',
+                            background: '#1a73e8',
+                            color: '#ffffff',
+                            fontWeight: 700,
+                            padding: '8px 14px',
+                            borderRadius: '8px',
+                            fontSize: '0.82rem',
+                            boxShadow: '0 3px 10px rgba(26, 115, 232, 0.3)',
+                          }}
                         >
-                          <ExternalLink size={14} />
+                          <Navigation size={14} />
                           <span>Open in Google Maps</span>
+                          <ExternalLink size={12} />
                         </a>
                       </div>
                     )}
