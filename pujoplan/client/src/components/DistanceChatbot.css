@@ -774,7 +774,8 @@
   box-shadow: 0 4px 12px rgba(234, 67, 53, 0.4);
 }
 
-.distbot-send-btn:disabled {
+.distbot-send-btn:disabled,
+.distbot-send-btn--disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

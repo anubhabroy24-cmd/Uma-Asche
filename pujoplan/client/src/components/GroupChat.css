@@ -1010,7 +1010,8 @@
   transform: scale(0.95);
 }
 
-.gc__send-btn:disabled {
+.gc__send-btn:disabled,
+.gc__send-btn--disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

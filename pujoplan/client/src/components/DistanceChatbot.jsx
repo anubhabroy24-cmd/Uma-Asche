@@ -107,6 +107,7 @@ export default function DistanceChatbot({
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const localCacheRef = useRef(new Map());
+  const chatInputRef = useRef(null);
 
   // Auto scroll inside chatbot message container ONLY (prevents outer page scrolling)
   const scrollToBottom = () => {
@@ -265,6 +266,10 @@ export default function DistanceChatbot({
   const handleSubmit = (e) => {
     e.preventDefault();
     sendMessage();
+    if (chatInputRef.current) chatInputRef.current.focus();
+    setTimeout(() => {
+      if (chatInputRef.current) chatInputRef.current.focus();
+    }, 10);
   };
 
   const handleClearChat = () => {
@@ -612,6 +617,7 @@ export default function DistanceChatbot({
           {/* Chat Input Bar */}
           <form className="distbot-input-form" onSubmit={handleSubmit}>
             <input
+              ref={chatInputRef}
               type="text"
               className="distbot-input"
               value={input}
@@ -621,8 +627,13 @@ export default function DistanceChatbot({
             />
             <button
               type="submit"
-              className="distbot-send-btn"
-              disabled={!input.trim()}
+              className={`distbot-send-btn ${!input.trim() ? 'distbot-send-btn--disabled' : ''}`}
+              tabIndex={-1}
+              onMouseDown={(e) => e.preventDefault()}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (chatInputRef.current) chatInputRef.current.focus();
+              }}
               title="Send query"
             >
               <Send size={16} />

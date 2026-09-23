@@ -186,6 +186,7 @@ export default function GroupChat({ groupId, currentUser }) {
   const messagesEndRef = useRef(null);
   const feedContainerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
   const isInitialLoadRef = useRef(true);
   const currentUserRef = useRef(currentUser);
 
@@ -491,11 +492,22 @@ export default function GroupChat({ groupId, currentUser }) {
     const text = inputText.trim();
     const photo = selectedPhoto?.dataUrl || null;
 
-    if ((!text && !photo) || sending) return;
+    if ((!text && !photo) || sending) {
+      if (inputRef.current) inputRef.current.focus();
+      return;
+    }
 
     setSending(true);
     setInputText('');
     setSelectedPhoto(null);
+
+    // Keep mobile keyboard open by retaining focus on input
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 10);
 
     // Optimistic message append
     const tempId = 'temp-' + Date.now();
@@ -538,6 +550,10 @@ export default function GroupChat({ groupId, currentUser }) {
       alert(err.response?.data?.error || 'Failed to send message.');
     } finally {
       setSending(false);
+      // Ensure focus remains in input field after network completion
+      setTimeout(() => {
+        if (inputRef.current) inputRef.current.focus();
+      }, 20);
     }
   }
 
@@ -545,6 +561,7 @@ export default function GroupChat({ groupId, currentUser }) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend(e);
+      if (inputRef.current) inputRef.current.focus();
     }
   }
 
@@ -788,6 +805,7 @@ export default function GroupChat({ groupId, currentUser }) {
         </button>
 
         <input
+          ref={inputRef}
           type="text"
           className="gc__input"
           placeholder={selectedPhoto ? 'Add a caption…' : 'Message your group…'}
@@ -800,9 +818,20 @@ export default function GroupChat({ groupId, currentUser }) {
 
         <button
           type="submit"
-          className="gc__send-btn"
-          disabled={(!inputText.trim() && !selectedPhoto) || sending}
+          className={`gc__send-btn ${(!inputText.trim() && !selectedPhoto) || sending ? 'gc__send-btn--disabled' : ''}`}
           aria-label="Send message"
+          tabIndex={-1}
+          onMouseDown={(e) => {
+            // Prevent mouse from stealing focus from text input
+            e.preventDefault();
+          }}
+          onPointerDown={(e) => {
+            // Prevent touch pointer from stealing focus from text input
+            e.preventDefault();
+          }}
+          onClick={() => {
+            if (inputRef.current) inputRef.current.focus();
+          }}
         >
           <Send size={16} />
         </button>
