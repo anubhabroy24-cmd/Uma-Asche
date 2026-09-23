@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AppLayout from '../layouts/AppLayout';
@@ -362,6 +362,39 @@ export default function GroupDashboard() {
       return next;
     });
   }, []);
+
+  const enrichedGroupSpots = useMemo(() => {
+    const pandalWps = (waypoints || []).filter(w => !w.id?.startsWith('start-'));
+    if (pandalWps.length > 0) {
+      return pandalWps.map(wp => {
+        const matched = findMatchingPandal(wp.spotId, wp.name);
+        return {
+          name: wp.name,
+          area: matched?.area || 'Kolkata',
+          nearestMetro: matched?.nearestMetro || '',
+          lat: wp.lat,
+          lng: wp.lng,
+        };
+      });
+    }
+
+    if (!group?.spots) return [];
+    return group.spots.map((gs, idx) => {
+      const targetSpotId = gs?.spotId || gs?.id || gs?.spot?._id;
+      const matched = findMatchingPandal(targetSpotId, gs?.spot?.name || gs?.name);
+      const dbSpot = gs?.spot || {};
+      const name = (dbSpot.name && dbSpot.name !== 'Pandal Spot') ? dbSpot.name : (matched?.name || gs?.name || `Pandal ${idx + 1}`);
+      const area = dbSpot.area || matched?.area || gs?.area || 'Kolkata';
+      const nearestMetro = dbSpot.nearestMetro || matched?.nearestMetro || gs?.nearestMetro || '';
+      return {
+        ...(matched || {}),
+        ...(dbSpot || {}),
+        name,
+        area,
+        nearestMetro,
+      };
+    });
+  }, [waypoints, group?.spots]);
 
   // Invalidate map bounds on tab switch to route
   useEffect(() => {
@@ -1396,7 +1429,7 @@ export default function GroupDashboard() {
           <div className="gd__tab-pane gd__tab-pane--fullscreen">
             <DistanceChatbot
               embedded={true}
-              groupSpots={group?.spots ? group.spots.map(s => s.spot || s) : []}
+              groupSpots={enrichedGroupSpots}
               groupName={group?.name}
               startLocation={group?.startLocation}
               waypoints={waypoints}

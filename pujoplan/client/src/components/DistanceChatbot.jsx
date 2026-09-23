@@ -368,14 +368,6 @@ export default function DistanceChatbot({
                   </div>
                 ) : (
                   <div className="distbot-msg__card">
-                    {/* Gemini Badge */}
-                    {m.source === 'gemini' && (
-                      <div className="distbot-gemini-badge">
-                        <Sparkles size={11} color="#4285f4" />
-                        <span>Gemini AI</span>
-                      </div>
-                    )}
-
                     {/* Warning if key issues */}
                     {m.warning && (
                       <div className="distbot-msg__warning" style={{ color: '#ffb300', fontSize: '0.74rem', marginBottom: 6 }}>
@@ -389,7 +381,7 @@ export default function DistanceChatbot({
                     </div>
 
                     {/* Direct Google Maps Link Button */}
-                    {m.gmapsUrl && m.type !== 'bathroom_card' && m.type !== 'distance_card' && (
+                    {m.gmapsUrl && m.type !== 'bathroom_card' && m.type !== 'distance_card' && !m.reply?.includes('google.com/maps') && !m.reply?.includes('maps.google') && (
                       <div style={{ marginTop: 8 }}>
                         <a
                           href={m.gmapsUrl}

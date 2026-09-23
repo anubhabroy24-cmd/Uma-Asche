@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout';
 import PujaMap from '../components/PujaMap';
@@ -270,6 +270,38 @@ export default function SoloPlanDetail() {
     }
   }
 
+  const enrichedPlanSpots = useMemo(() => {
+    const pandalWps = (waypoints || []).filter(w => !w.id?.startsWith('start-'));
+    if (pandalWps.length > 0) {
+      return pandalWps.map(wp => {
+        const matched = findMatchingPandal(wp.spotId, wp.name);
+        return {
+          name: wp.name,
+          area: matched?.area || wp.area || 'Kolkata',
+          nearestMetro: matched?.nearestMetro || wp.nearestMetro || '',
+          lat: wp.lat,
+          lng: wp.lng,
+        };
+      });
+    }
+    if (!plan?.spots) return [];
+    return plan.spots.map((ps, idx) => {
+      const targetSpotId = ps?.spotId || ps?.id || ps?.spot?._id;
+      const matched = findMatchingPandal(targetSpotId, ps?.spot?.name || ps?.name);
+      const dbSpot = ps?.spot || {};
+      const name = (dbSpot.name && dbSpot.name !== 'Pandal Spot') ? dbSpot.name : (matched?.name || ps?.name || `Pandal ${idx + 1}`);
+      const area = dbSpot.area || matched?.area || ps?.area || 'Kolkata';
+      const nearestMetro = dbSpot.nearestMetro || matched?.nearestMetro || ps?.nearestMetro || '';
+      return {
+        ...(matched || {}),
+        ...(dbSpot || {}),
+        name,
+        area,
+        nearestMetro,
+      };
+    });
+  }, [waypoints, plan?.spots]);
+
   // ── Render ────────────────────────────────────────
   if (loading) return <AppLayout back onBack={() => navigate('/solo')}><div className="center-flex"><div className="spinner" /></div></AppLayout>;
   if (error) return (
@@ -468,7 +500,7 @@ export default function SoloPlanDetail() {
           <div className="gd__tab-pane gd__tab-pane--fullscreen">
             <DistanceChatbot
               embedded={true}
-              groupSpots={plan?.spots ? plan.spots.map(ps => ps.spot || ps) : []}
+              groupSpots={enrichedPlanSpots}
               groupName={plan?.name}
               startLocation={plan?.startLocation}
               waypoints={waypoints}
