@@ -85,6 +85,18 @@ export default function SoloPlanDetail() {
   const [visitedStops, setVisitedStops] = useState(new Set());
   const mapRef = useRef(null);
 
+  // Android hardware back key listener: if on ai or route tab, switch back to 'plan' tab
+  useEffect(() => {
+    const handleAppBack = (e) => {
+      if (activeTab !== 'plan') {
+        e.preventDefault();
+        setActiveTab('plan');
+      }
+    };
+    window.addEventListener('app:back', handleAppBack);
+    return () => window.removeEventListener('app:back', handleAppBack);
+  }, [activeTab]);
+
   // ── Auto GPS when mounted or when Route tab opens ──
   const requestGpsLocation = useCallback(() => {
     if (!navigator?.geolocation) return;
@@ -268,18 +280,6 @@ export default function SoloPlanDetail() {
       </div>
     </AppLayout>
   );
-
-  // Android hardware back key listener: if on ai or route tab, switch back to 'plan' tab
-  React.useEffect(() => {
-    const handleAppBack = (e) => {
-      if (activeTab !== 'plan') {
-        e.preventDefault();
-        setActiveTab('plan');
-      }
-    };
-    window.addEventListener('app:back', handleAppBack);
-    return () => window.removeEventListener('app:back', handleAppBack);
-  }, [activeTab]);
 
   const isFullChatView = activeTab === 'ai';
 

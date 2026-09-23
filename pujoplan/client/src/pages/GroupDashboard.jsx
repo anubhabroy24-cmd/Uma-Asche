@@ -318,6 +318,19 @@ export default function GroupDashboard() {
       setActiveTab('chat');
     }
   }, [location.search]);
+
+  // Android hardware back key listener: if on chat, ai, or route tab, switch back to 'plan' tab
+  useEffect(() => {
+    const handleAppBack = (e) => {
+      if (activeTab !== 'plan') {
+        e.preventDefault();
+        setActiveTab('plan');
+      }
+    };
+    window.addEventListener('app:back', handleAppBack);
+    return () => window.removeEventListener('app:back', handleAppBack);
+  }, [activeTab]);
+
   const [routeData, setRouteData] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
@@ -1022,18 +1035,6 @@ export default function GroupDashboard() {
     .sort((a, b) => b.voteCount - a.voteCount);
 
   const activeMembers = locations.filter(m => m.isSharingLocation && m.latitude && m.longitude);
-  // Android hardware back key listener: if on chat, ai, or route tab, switch back to 'plan' tab
-  useEffect(() => {
-    const handleAppBack = (e) => {
-      if (activeTab !== 'plan') {
-        e.preventDefault();
-        setActiveTab('plan');
-      }
-    };
-    window.addEventListener('app:back', handleAppBack);
-    return () => window.removeEventListener('app:back', handleAppBack);
-  }, [activeTab]);
-
   const activeSharingCount = activeMembers.length;
   const isFullChatView = activeTab === 'chat' || activeTab === 'ai';
 
