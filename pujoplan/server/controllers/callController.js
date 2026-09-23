@@ -1,5 +1,5 @@
 const { StreamClient } = require('@stream-io/node-sdk');
-const { emitGroupUpdate } = require('../services/socketService');
+const { emitGroupUpdate, emitToUser } = require('../services/socketService');
 const Call = require('../models/Call');
 const Group = require('../models/Group');
 
@@ -88,10 +88,28 @@ async function getCallStatus(req, res, next) {
     if (!groupId) return res.json({ active: false, call: null });
 
     const call = await Call.findOne({ groupId, status: { $ne: 'ended' } });
+    if (!call || call.status === 'ended') {
+      return res.json({ active: false, call: null });
+    }
+
+    // Auto-timeout stale calls that have been 'ringing' for > 60 seconds without acceptance
+    const callAge = Date.now() - new Date(call.updatedAt || call.createdAt).getTime();
+    if (call.status === 'ringing' && callAge > 60000) {
+      call.status = 'ended';
+      await call.save().catch(() => {});
+      return res.json({ active: false, call: null });
+    }
+
+    const grp = await Group.findOne({ id: groupId }).select('name').catch(() => null);
+
     return res.json({
-      active: !!call && call.status !== 'ended',
+      active: true,
+      groupId: call.groupId,
+      groupName: grp?.name || 'Puja Group',
       callMode: call?.type || 'video',
+      status: call?.status || 'ringing',
       startedBy: call?.caller || null,
+      caller: call?.caller || null,
       startedAt: call?.createdAt ? new Date(call.createdAt).getTime() : Date.now(),
       participants: (call?.candidates || []).map(c => ({
         id: c.userId || c.id,
@@ -116,12 +134,38 @@ async function handleCallSignal(req, res, next) {
     const user = req.user || {};
 
     const callerObj = {
-      id: user.id || user.uid,
+      id: user.id || user.uid || 'user_' + Date.now(),
+      userId: user.id || user.uid || 'user_' + Date.now(),
       name: user.name || 'Group Member',
       profileImage: user.profileImage || null,
+      email: user.email || null,
     };
 
     const targetCallId = callId || channelName || `group_${groupId}`;
+    const grp = await Group.findOne({ id: groupId }).catch(() => null);
+    const groupName = grp?.name || 'Puja Group';
+
+    // Helper to gather all member identifiers for direct targeted delivery
+    const getMemberIdentifiers = () => {
+      const ids = new Set();
+      if (!grp) return ids;
+      if (grp.adminId) ids.add(grp.adminId);
+      if (grp.admin?.id) ids.add(grp.admin.id);
+      if (Array.isArray(grp.memberUids)) {
+        grp.memberUids.forEach(uid => uid && ids.add(uid));
+      }
+      if (Array.isArray(grp.members)) {
+        grp.members.forEach(m => {
+          if (m.userId) ids.add(m.userId);
+          if (m.user?.id) ids.add(m.user.id);
+          if (m.user?.email) ids.add(`email:${m.user.email.toLowerCase().trim()}`);
+        });
+      }
+      if (grp.admin?.email) {
+        ids.add(`email:${grp.admin.email.toLowerCase().trim()}`);
+      }
+      return ids;
+    };
 
     if (type === 'start' || type === 'startCall' || type === 'call_started') {
       let call = await Call.findOne({ groupId });
@@ -141,48 +185,64 @@ async function handleCallSignal(req, res, next) {
       }
       await call.save();
 
-      emitGroupUpdate(groupId, 'incomingCall', {
+      const callPayload = {
         groupId,
+        groupName,
         callId: targetCallId,
         channelName: targetCallId,
         callMode,
         caller: callerObj,
+        startedBy: callerObj,
+        startedAt: Date.now(),
         targetUserId: targetUserId || 'all',
+        status: 'ringing',
+      };
+
+      console.log(`[CallController] 📞 Broadcasting incoming call in "${groupName}" (${groupId}) by ${callerObj.name}`);
+      // 1. Emit to group socket room
+      emitGroupUpdate(groupId, 'incomingCall', callPayload);
+      emitGroupUpdate(groupId, 'call_signal', {
+        ...callPayload,
+        type: 'start',
       });
 
-      emitGroupUpdate(groupId, 'call_signal', {
-        groupId,
-        type: 'start',
-        callId: targetCallId,
-        channelName: targetCallId,
-        callMode,
-        caller: callerObj,
-        status: 'ringing',
+      // 2. Emit directly to each individual group member's socket room
+      const memberIds = getMemberIdentifiers();
+      memberIds.forEach((uid) => {
+        emitToUser(uid, 'incomingCall', callPayload);
+        emitToUser(uid, 'call_signal', {
+          ...callPayload,
+          type: 'start',
+        });
       });
     } else if (type === 'accept' || type === 'acceptCall') {
       const call = await Call.findOne({ groupId });
       if (call) {
         call.status = 'active';
-        if (!call.candidates.some(c => c.id === callerObj.id)) {
+        if (!call.candidates.some(c => (c.id || c.userId) === callerObj.id)) {
           call.candidates.push(callerObj);
         }
         await call.save();
       }
 
-      emitGroupUpdate(groupId, 'callAccepted', {
+      const acceptPayload = {
         groupId,
-        callId: targetCallId,
-        channelName: targetCallId,
-        callee: callerObj,
-      });
-
-      emitGroupUpdate(groupId, 'call_signal', {
-        groupId,
-        type: 'accept',
+        groupName,
         callId: targetCallId,
         channelName: targetCallId,
         callee: callerObj,
         status: 'active',
+      };
+
+      emitGroupUpdate(groupId, 'callAccepted', acceptPayload);
+      emitGroupUpdate(groupId, 'call_signal', {
+        ...acceptPayload,
+        type: 'accept',
+      });
+
+      const memberIds = getMemberIdentifiers();
+      memberIds.forEach((uid) => {
+        emitToUser(uid, 'callAccepted', acceptPayload);
       });
     } else if (type === 'decline' || type === 'declineCall') {
       emitGroupUpdate(groupId, 'callDeclined', {
@@ -219,11 +279,16 @@ async function handleCallSignal(req, res, next) {
       });
 
       if (!call || (call.candidates && call.candidates.length === 0)) {
-        emitGroupUpdate(groupId, 'callEnded', {
+        const endPayload = {
           groupId,
           callId: targetCallId,
           channelName: targetCallId,
           senderId: callerObj.id,
+        };
+        emitGroupUpdate(groupId, 'callEnded', endPayload);
+        const memberIds = getMemberIdentifiers();
+        memberIds.forEach((uid) => {
+          emitToUser(uid, 'callEnded', endPayload);
         });
       }
     } else if (type === 'end' || type === 'endCall') {
@@ -232,19 +297,25 @@ async function handleCallSignal(req, res, next) {
         { status: 'ended', candidates: [] }
       );
 
-      emitGroupUpdate(groupId, 'callEnded', {
+      const endPayload = {
         groupId,
         callId: targetCallId,
         channelName: targetCallId,
         senderId: callerObj.id,
-      });
+      };
 
+      emitGroupUpdate(groupId, 'callEnded', endPayload);
       emitGroupUpdate(groupId, 'call_signal', {
         groupId,
         type: 'ended',
         callId: targetCallId,
         channelName: targetCallId,
         status: 'ended',
+      });
+
+      const memberIds = getMemberIdentifiers();
+      memberIds.forEach((uid) => {
+        emitToUser(uid, 'callEnded', endPayload);
       });
     }
 

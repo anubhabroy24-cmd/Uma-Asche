@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { getGroupMessages, sendGroupMessage, getCallStatus } from '../services/api';
+import { getGroupMessages, sendGroupMessage, getCallStatus, sendCallSignal } from '../services/api';
 import StreamCallModal from './StreamCallModal';
 import { showMobileNotification } from '../services/notificationService';
 import { subscribeToGroupUpdates } from '../services/socket';
@@ -268,6 +268,27 @@ export default function GroupChat({ groupId, currentUser }) {
           return [...filtered, msg];
         });
       },
+      onCallSignal: (data) => {
+        if (!data) return;
+        if (data.type === 'start') {
+          setCallActive(true);
+          if (data.callMode) setCallMode(data.callMode);
+          if (data.caller) setCallStartedBy(data.caller);
+        } else if (data.type === 'ended' || data.type === 'end') {
+          setCallActive(false);
+          setCallParticipants([]);
+        }
+      },
+      onIncomingCall: (data) => {
+        if (!data) return;
+        setCallActive(true);
+        if (data.callMode) setCallMode(data.callMode);
+        if (data.caller) setCallStartedBy(data.caller);
+      },
+      onCallEnded: () => {
+        setCallActive(false);
+        setCallParticipants([]);
+      },
     });
 
     // Fallback: slower poll every 8s in case socket misses something
@@ -330,13 +351,51 @@ export default function GroupChat({ groupId, currentUser }) {
 
 
   // ── Start / Join Call (Voice or Video) with Stream ──
-  function handleStartOrJoinCall(mode = 'video') {
+  const handleStartOrJoinCall = useCallback(async (mode = 'video') => {
     setCallMode(mode);
     setIsInCall(true);
+    window.__isUserInCall = true;
     try {
       import('../services/ringtoneService').then(m => m.stopRingtone());
     } catch (_) { }
-  }
+
+    // Broadcast call signal to server so all group members' phones ring
+    try {
+      await sendCallSignal(groupId, {
+        type: callActive ? 'accept' : 'start',
+        callMode: mode,
+        channelName: `group_${groupId}`,
+        callId: `group_${groupId}`,
+      });
+    } catch (err) {
+      console.warn('[Call] Failed to send start/join call signal:', err);
+    }
+  }, [groupId, callActive]);
+
+  const handleLeaveCall = useCallback(async () => {
+    setIsInCall(false);
+    window.__isUserInCall = false;
+    try {
+      import('../services/ringtoneService').then(m => m.stopRingtone());
+    } catch (_) { }
+    try {
+      await sendCallSignal(groupId, {
+        type: 'leave',
+        channelName: `group_${groupId}`,
+        callId: `group_${groupId}`,
+      });
+    } catch (_) { }
+  }, [groupId]);
+
+  // Auto-join if user arrived from answering incoming call overlay
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('call') === 'join') {
+      const mode = params.get('mode') || 'video';
+      handleStartOrJoinCall(mode);
+      window.history.replaceState(null, '', window.location.pathname + '?tab=chat');
+    }
+  }, [groupId, handleStartOrJoinCall]);
 
   async function handleFileSelect(e) {
     const file = e.target.files?.[0];
@@ -449,7 +508,7 @@ export default function GroupChat({ groupId, currentUser }) {
           currentUser={currentUser}
           callMode={callMode}
           isOpen={isInCall}
-          onClose={() => setIsInCall(false)}
+          onClose={handleLeaveCall}
         />
       )}
 

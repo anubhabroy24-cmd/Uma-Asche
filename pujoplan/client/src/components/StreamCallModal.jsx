@@ -33,6 +33,16 @@ export default function StreamCallModal({ groupId, groupName, currentUser, callM
         });
         call = client.call('default', data.callId || `group_${groupId}`);
         await call.join({ create: true });
+
+        // Enable devices based on video vs voice call mode
+        if (callMode === 'voice' || callMode === 'audio') {
+          await call.camera.disable().catch(() => {});
+          await call.microphone.enable().catch(() => {});
+        } else {
+          await call.camera.enable().catch(() => {});
+          await call.microphone.enable().catch(() => {});
+        }
+
         if (!cancelled) setSession({ client, call });
       } catch (err) {
         if (!cancelled) setError(err.message || 'Unable to connect to the group call.');

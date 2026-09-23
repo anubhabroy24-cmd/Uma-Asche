@@ -1,6 +1,10 @@
 const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
 const { verifyIdToken } = require('../config/firebase');
 const Group = require('../models/Group');
+const User = require('../models/User');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'pujoplan_jwt_super_secret_2026_kolkata_durga_puja';
 
 let io = null;
 
@@ -54,15 +58,53 @@ function initSocket(server, clientUrl) {
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
-      console.log(`[Socket] 🔐 Auth attempt - token exists: ${!!token}`);
       if (token) {
-        const decoded = await verifyIdToken(token).catch((err) => {
-          console.warn(`[Socket] ⚠️ Token verification failed:`, err.message);
-          return null;
-        });
-        if (decoded) {
-          socket.user = decoded;
-          console.log(`[Socket] ✅ Authenticated user: ${decoded.name || decoded.uid}`);
+        let uid = null;
+        let decoded = null;
+
+        // 1. Fast path: verify our own app JWT token (issued by /api/auth/session)
+        try {
+          const jwtPayload = jwt.verify(token, JWT_SECRET);
+          uid = jwtPayload.uid || jwtPayload.user_id || jwtPayload.sub;
+          if (uid) {
+            decoded = {
+              uid,
+              name: jwtPayload.name || null,
+              email: jwtPayload.email || null,
+              picture: jwtPayload.picture || null,
+            };
+          }
+        } catch (_) {
+          // Not an app JWT — fallback to Firebase token
+        }
+
+        // 2. Slow path: verify Firebase ID token
+        if (!uid) {
+          decoded = await verifyIdToken(token).catch((err) => {
+            console.warn(`[Socket] ⚠️ Token verification failed:`, err.message);
+            return null;
+          });
+          if (decoded) {
+            uid = decoded.uid;
+          }
+        }
+
+        if (uid) {
+          // Resolve full user from DB if available
+          const dbUser = await User.findOne({ uid }).catch(() => null);
+          const resolvedName = dbUser?.name || decoded?.name || (decoded?.email ? decoded.email.split('@')[0] : 'Explorer');
+          const resolvedEmail = dbUser?.email || decoded?.email || '';
+          const resolvedPhoto = dbUser?.profileImage || decoded?.picture || null;
+
+          socket.user = {
+            id: uid,
+            uid: uid,
+            _id: dbUser?._id ? String(dbUser._id) : uid,
+            name: resolvedName,
+            email: resolvedEmail,
+            profileImage: resolvedPhoto,
+          };
+          console.log(`[Socket] ✅ Authenticated user: ${socket.user.name} (${uid})`);
         } else {
           console.warn(`[Socket] ❌ Token verification returned null`);
           socket.user = { uid: 'guest_' + socket.id, name: 'Explorer', id: 'guest_' + socket.id };
@@ -84,9 +126,14 @@ function initSocket(server, clientUrl) {
     const uid = user.uid || user.id;
     console.log(`[Socket] ⚡ User connected: ${user.name || uid} (${socket.id})`);
 
+    // Personal user rooms for targeted direct calls and notifications
+    if (uid) socket.join(`user:${uid}`);
+    if (user.id && user.id !== uid) socket.join(`user:${user.id}`);
+    if (user._id && String(user._id) !== uid && String(user._id) !== user.id) socket.join(`user:${String(user._id)}`);
+    if (email) socket.join(`user:email:${email}`);
+
     // Auto-join all groups this user belongs to
     const uids = [user.uid, user.id, user._id ? String(user._id) : null].filter(Boolean);
-    const email = (user.email || '').toLowerCase().trim();
 
     const orConditions = [
       { memberUids: { $in: uids } },
@@ -119,18 +166,12 @@ function initSocket(server, clientUrl) {
         .catch(() => {});
     }
 
-
-
     // Join a specific group room
     socket.on('join_group', (groupId) => {
       if (groupId) {
         const room = `group:${groupId}`;
         socket.join(room);
         console.log(`[Socket] 🚪 ${user.name || user.uid} joined room: ${room} (socket: ${socket.id})`);
-        
-        // Confirm room join by checking socket rooms
-        const rooms = Array.from(socket.rooms);
-        console.log(`[Socket] 📋 Active rooms for ${socket.id}:`, rooms);
       }
     });
 
@@ -148,13 +189,9 @@ function initSocket(server, clientUrl) {
 
     // Leave a specific group room
     socket.on('leave_group', (groupId) => {
-      if (groupId) {
-        const room = `group:${groupId}`;
-        socket.leave(room);
-        console.log(`[Socket] 🚪 ${user.name || user.uid} left room: ${room}`);
-      }
+      // Don't detach group room for registered members so they keep receiving calls
+      console.log(`[Socket] ℹ️ leave_group signal for ${groupId} from ${user.name || user.uid}`);
     });
-
 
     socket.on('disconnect', () => {
       console.log(`[Socket] 🔌 User disconnected: ${user.name || user.uid} (${socket.id})`);
@@ -177,12 +214,16 @@ function emitGroupUpdate(groupId, eventName, payload) {
     
     console.log(`[Socket] 📤 Emitting '${eventName}' to room '${room}' (${clientCount} clients)`);
     io.to(room).emit(eventName, payload);
-    
-    if (clientCount === 0) {
-      console.warn(`[Socket] ⚠️ No clients in room '${room}' to receive '${eventName}'`);
-    }
   } else {
     console.warn(`[Socket] ⚠️ Cannot emit '${eventName}': io=${!!io}, groupId=${groupId}`);
+  }
+}
+
+// Emit update directly to an individual user across all their sockets
+function emitToUser(userId, eventName, payload) {
+  if (io && userId) {
+    const room = `user:${userId}`;
+    io.to(room).emit(eventName, payload);
   }
 }
 
@@ -190,4 +231,5 @@ module.exports = {
   initSocket,
   getIO,
   emitGroupUpdate,
+  emitToUser,
 };

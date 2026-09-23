@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getMyGroups, getCallStatus, sendCallSignal } from '../services/api';
 import { startRingtone, stopRingtone } from '../services/ringtoneService';
 import { showMobileNotification } from '../services/notificationService';
-import { rtcConfig } from './GroupChat';
+import { getSocket } from '../services/socket';
 import { Phone, PhoneOff, Video, Radio } from 'lucide-react';
 import './IncomingCallOverlay.css';
 
@@ -21,13 +21,27 @@ export default function IncomingCallOverlay() {
   // Helper to check if a user matches current logged-in user
   const isSelf = useCallback((targetUser) => {
     if (!targetUser || !user) return false;
-    const tUid = targetUser.id || targetUser.userId || targetUser.uid;
-    const tEmail = (targetUser.email || '').toLowerCase().trim();
-    const uUid = user.id || user.userId || user.firebaseUid;
-    const uEmail = (user.email || '').toLowerCase().trim();
+    const tUids = [
+      targetUser.id,
+      targetUser.userId,
+      targetUser.uid,
+      targetUser._id,
+    ].filter(Boolean).map(String);
 
-    if (tUid && (tUid === uUid || tUid === user.firebaseUid || tUid === user.id)) return true;
+    const uUids = [
+      user.id,
+      user.userId,
+      user.uid,
+      user.firebaseUid,
+      user._id,
+    ].filter(Boolean).map(String);
+
+    if (tUids.some(tid => uUids.includes(tid))) return true;
+
+    const tEmail = (targetUser.email || '').toLowerCase().trim();
+    const uEmail = (user.email || '').toLowerCase().trim();
     if (tEmail && uEmail && tEmail === uEmail) return true;
+
     return false;
   }, [user]);
 
@@ -47,7 +61,86 @@ export default function IncomingCallOverlay() {
     return () => clearTimeout(timer);
   }, [activeIncomingCall]);
 
-  // Polling & Realtime call state checker
+  // Handler to trigger incoming call ring on this device
+  const triggerIncomingCall = useCallback((callData) => {
+    if (!user || window.__isUserInCall) return;
+    const caller = callData.startedBy || callData.caller;
+    if (!caller || isSelf(caller)) return;
+
+    // If user is currently in the active call page, don't show incoming overlay
+    if (location.pathname.startsWith('/group/') && location.search.includes('call=join')) {
+      stopRingtone();
+      setActiveIncomingCall(null);
+      return;
+    }
+
+    const sessionId = `${callData.groupId}_${callData.startedAt || caller.id || caller.userId || Date.now()}`;
+    if (dismissedSessionsRef.current.has(sessionId)) return;
+
+    setActiveIncomingCall({
+      groupId: callData.groupId,
+      groupName: callData.groupName || 'Puja Group',
+      sessionId,
+      callMode: callData.callMode || 'video',
+      startedBy: caller,
+      startedAt: callData.startedAt || Date.now(),
+    });
+
+    startRingtone();
+
+    const modeLabel = callData.callMode === 'voice' ? '📞 Voice Call' : '📹 Video Call';
+    showMobileNotification({
+      title: `Incoming ${modeLabel}`,
+      body: `${caller.name || 'Group member'} is calling in "${callData.groupName || 'your group'}". Tap to answer!`,
+      id: (Date.now() % 100000),
+      sound: 'default',
+    });
+  }, [user, isSelf, location.pathname, location.search]);
+
+  // ── Real-Time Socket.io Event Listener (Instant Delivery in Milliseconds) ──
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+
+    const handleIncomingCallSocket = (data) => {
+      console.log('[IncomingCallOverlay] 📞 Socket incomingCall event received:', data);
+      if (data && data.groupId) {
+        triggerIncomingCall(data);
+      }
+    };
+
+    const handleCallSignalSocket = (data) => {
+      if (!data) return;
+      if (data.type === 'start' || data.type === 'startCall') {
+        triggerIncomingCall(data);
+      } else if (data.type === 'ended' || data.type === 'end') {
+        if (activeIncomingCallRef.current && activeIncomingCallRef.current.groupId === data.groupId) {
+          stopRingtone();
+          setActiveIncomingCall(null);
+        }
+      }
+    };
+
+    const handleCallEndedSocket = (data) => {
+      console.log('[IncomingCallOverlay] ❌ Socket callEnded event received:', data);
+      if (activeIncomingCallRef.current && activeIncomingCallRef.current.groupId === data?.groupId) {
+        stopRingtone();
+        setActiveIncomingCall(null);
+      }
+    };
+
+    socket.on('incomingCall', handleIncomingCallSocket);
+    socket.on('call_signal', handleCallSignalSocket);
+    socket.on('callEnded', handleCallEndedSocket);
+
+    return () => {
+      socket.off('incomingCall', handleIncomingCallSocket);
+      socket.off('call_signal', handleCallSignalSocket);
+      socket.off('callEnded', handleCallEndedSocket);
+    };
+  }, [user, triggerIncomingCall]);
+
+  // ── Polling & Fallback call state checker ──
   const checkForActiveCalls = useCallback(async () => {
     if (!user || checkingRef.current) return;
     if (window.__isUserInCall) {
@@ -58,7 +151,6 @@ export default function IncomingCallOverlay() {
     checkingRef.current = true;
 
     try {
-      // If user is currently in the active call page, don't show incoming overlay
       if (location.pathname.startsWith('/group/') && location.search.includes('call=join')) {
         stopRingtone();
         setActiveIncomingCall(null);
@@ -82,6 +174,14 @@ export default function IncomingCallOverlay() {
       if (!Array.isArray(groups) || groups.length === 0) return;
       groupsRef.current = groups;
 
+      // Ensure socket joins all group rooms
+      try {
+        const socket = getSocket();
+        if (socket && groups.length > 0) {
+          socket.emit('join_groups', groups.map(g => g.id).filter(Boolean));
+        }
+      } catch (_) {}
+
       for (const grp of groups) {
         if (!grp || !grp.id) continue;
         try {
@@ -103,22 +203,13 @@ export default function IncomingCallOverlay() {
               continue;
             }
 
-            setActiveIncomingCall({
+            triggerIncomingCall({
               groupId: grp.id,
               groupName: grp.name,
               sessionId,
               callMode: status.callMode || 'video',
               startedBy: status.startedBy,
               startedAt: status.startedAt || Date.now(),
-            });
-
-            startRingtone();
-
-            const modeLabel = status.callMode === 'video' ? '📹 Video Call' : '📞 Voice Call';
-            showMobileNotification({
-              title: `Incoming ${modeLabel}`,
-              body: `${status.startedBy.name || 'Group member'} is calling in "${grp.name}". Tap to answer!`,
-              id: (Date.now() % 100000),
             });
 
             return;
@@ -129,7 +220,7 @@ export default function IncomingCallOverlay() {
     } finally {
       checkingRef.current = false;
     }
-  }, [user, location.pathname, location.search, isSelf]);
+  }, [user, location.pathname, location.search, isSelf, triggerIncomingCall]);
 
   useEffect(() => {
     checkForActiveCalls();
@@ -160,6 +251,7 @@ export default function IncomingCallOverlay() {
     dismissedSessionsRef.current.add(sessionId);
     stopRingtone();
     setActiveIncomingCall(null);
+    sendCallSignal(groupId, { type: 'accept', callMode }).catch(() => {});
     navigate(`/group/${groupId}?tab=chat&call=join&mode=${callMode}`);
   }
 
