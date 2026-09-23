@@ -258,6 +258,11 @@ export default function IncomingCallOverlay() {
       sendCallSignal(activeIncomingCall.groupId, { type: 'decline' }).catch(() => { });
     }
     stopRingtone();
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.dismissCall) {
+        window.AndroidBridge.dismissCall();
+      }
+    } catch (_) {}
     setActiveIncomingCall(null);
   }
 
@@ -266,6 +271,11 @@ export default function IncomingCallOverlay() {
     const { groupId, callMode, sessionId } = activeIncomingCall;
     dismissedSessionsRef.current.add(sessionId);
     stopRingtone();
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.dismissCall) {
+        window.AndroidBridge.dismissCall();
+      }
+    } catch (_) {}
     setActiveIncomingCall(null);
     sendCallSignal(groupId, { type: 'accept', callMode }).catch(() => {});
     navigate(`/group/${groupId}?tab=chat&call=join&mode=${callMode}`);

@@ -69,11 +69,16 @@ function getRingAudioElement() {
   if (typeof window === 'undefined') return null;
   if (!ringAudioElement) {
     try {
-      const blob = generateRingtoneWavBlob();
-      const url = URL.createObjectURL(blob);
-      ringAudioElement = new Audio(url);
+      ringAudioElement = new Audio('/pather_panchali.mp3');
       ringAudioElement.loop = true;
       ringAudioElement.volume = 1.0;
+      ringAudioElement.onerror = () => {
+        try {
+          const blob = generateRingtoneWavBlob();
+          const url = URL.createObjectURL(blob);
+          ringAudioElement.src = url;
+        } catch (_) {}
+      };
     } catch (e) {
       console.warn('[RingtoneService] Audio element warning:', e);
     }

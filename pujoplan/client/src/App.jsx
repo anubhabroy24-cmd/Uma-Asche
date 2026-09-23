@@ -147,6 +147,18 @@ function AppRoutes() {
     };
   }, [navigate]);
 
+  // Handle incoming call answer from native Android notification action
+  React.useEffect(() => {
+    const handleNativeAnswer = (e) => {
+      const detail = e.detail || {};
+      if (detail.groupId) {
+        navigate(`/group/${detail.groupId}?tab=chat&call=join&mode=${detail.callMode || 'video'}`);
+      }
+    };
+    window.addEventListener('native:answer_call', handleNativeAnswer);
+    return () => window.removeEventListener('native:answer_call', handleNativeAnswer);
+  }, [navigate]);
+
   React.useEffect(() => {
     // 1. Initialize notification channel & request notification permission directly with system
     import('./services/notificationService')

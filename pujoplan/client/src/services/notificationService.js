@@ -13,7 +13,7 @@ export async function createCallNotificationChannel() {
         description: 'Loud ringing notifications for incoming Puja group calls',
         importance: 5, // High importance (heads-up pop-up + sound)
         visibility: 1, // Visible on lockscreen
-        sound: 'default',
+        sound: 'pather_panchali.mp3',
         vibration: true,
         lights: true,
         lightColor: '#ff0055',

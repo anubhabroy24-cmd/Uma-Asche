@@ -96,6 +96,13 @@ export function AuthProvider({ children }) {
             localStorage.setItem('pp_user', JSON.stringify(stored));
             setUser(stored);
             setLoading(false);
+            // Sync with native AndroidBridge so BackgroundCallService monitors incoming calls
+            try {
+              if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.saveUserSession) {
+                const uid = stored.id || stored.userId || stored.uid || stored.firebaseUid || '';
+                window.AndroidBridge.saveUserSession(String(uid), token || '', stored.name || '', 'https://uma-asche.onrender.com/api');
+              }
+            } catch (_) {}
             return;
           }
         } catch (_) { }
@@ -124,6 +131,14 @@ export function AuthProvider({ children }) {
         localStorage.setItem('pp_token', data.token);
         localStorage.setItem('pp_user', JSON.stringify(userObj));
         setUser(userObj);
+
+        // Sync with native AndroidBridge so BackgroundCallService monitors incoming calls
+        try {
+          if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.saveUserSession) {
+            const uid = userObj.id || userObj.userId || userObj.uid || userObj.firebaseUid || '';
+            window.AndroidBridge.saveUserSession(String(uid), data.token || '', userObj.name || '', 'https://uma-asche.onrender.com/api');
+          }
+        } catch (_) {}
       } catch (e) {
         console.error('[Auth] Session exchange failed:', e.message);
         await signOutUser().catch(() => { });
@@ -166,6 +181,11 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     setUser(null);
+    try {
+      if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.clearUserSession) {
+        window.AndroidBridge.clearUserSession();
+      }
+    } catch (_) {}
     try {
       // Clear user session tokens only, keep offline persistent cache for groups
       localStorage.removeItem('pp_token');

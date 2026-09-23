@@ -1,4 +1,5 @@
 const { StreamClient } = require('@stream-io/node-sdk');
+const jwt = require('jsonwebtoken');
 const { emitGroupUpdate, emitToUser } = require('../services/socketService');
 const Call = require('../models/Call');
 const Group = require('../models/Group');
@@ -325,9 +326,91 @@ async function handleCallSignal(req, res, next) {
   }
 }
 
+/**
+ * GET /api/calls/check-active?userId=...
+ * Check if there is an active incoming call ringing for the specified user in any of their groups
+ */
+async function checkActiveCallsForUser(req, res) {
+  try {
+    let userId = req.query.userId || req.user?.id || req.user?.uid;
+    // If not in query or req.user, check Authorization header if present
+    if (!userId && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.slice(7).trim();
+        const jwtPayload = jwt.decode(token);
+        if (jwtPayload) {
+          userId = jwtPayload.uid || jwtPayload.id || jwtPayload.sub;
+        }
+      } catch (_) {}
+    }
+
+    if (!userId) {
+      return res.json({ hasCall: false, reason: 'missing_user_id' });
+    }
+
+    const now = Date.now();
+    // Find all active or ringing calls
+    const calls = await Call.find({ status: { $in: ['ringing', 'active'] } }).lean();
+    if (!calls || calls.length === 0) {
+      return res.json({ hasCall: false });
+    }
+
+    for (const call of calls) {
+      // Auto-expire ringing calls older than 60s
+      const callTime = new Date(call.updatedAt || call.createdAt).getTime();
+      if (call.status === 'ringing' && (now - callTime) > 60000) {
+        Call.updateOne({ _id: call._id }, { status: 'ended' }).exec().catch(() => {});
+        continue;
+      }
+
+      // If caller is the user themselves, skip
+      const callerId = call.caller?.id || call.caller?.userId;
+      if (callerId === userId) {
+        continue;
+      }
+
+      // Check if user is already participating in this call
+      if (Array.isArray(call.candidates) && call.candidates.some(c => (c.id || c.userId) === userId)) {
+        continue;
+      }
+
+      // Check if user belongs to call.groupId
+      const grp = await Group.findOne({ id: call.groupId }).select('id name adminId memberUids members').lean();
+      if (!grp) continue;
+
+      const isMember =
+        grp.adminId === userId ||
+        (Array.isArray(grp.memberUids) && grp.memberUids.includes(userId)) ||
+        (Array.isArray(grp.members) && grp.members.some(m => m.userId === userId || m.id === userId || m.user?.id === userId));
+
+      if (isMember) {
+        return res.json({
+          hasCall: true,
+          call: {
+            groupId: call.groupId,
+            groupName: grp.name || 'Puja Group',
+            callerName: call.caller?.name || 'Group Member',
+            callerImage: call.caller?.profileImage || null,
+            callMode: call.type || 'video',
+            callId: `group_${call.groupId}`,
+            status: call.status,
+            startedAt: call.createdAt ? new Date(call.createdAt).getTime() : now,
+          }
+        });
+      }
+    }
+
+    return res.json({ hasCall: false });
+  } catch (err) {
+    console.error('[checkActiveCallsForUser] error:', err.message);
+    return res.json({ hasCall: false, error: err.message });
+  }
+}
+
 module.exports = {
   generateStreamToken,
   generateAgoraToken: generateStreamToken, // alias for backward-compatibility
   getCallStatus,
   handleCallSignal,
+  checkActiveCallsForUser,
 };

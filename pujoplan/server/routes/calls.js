@@ -9,6 +9,7 @@ router.post('/stream-token', requireAuth, callCtrl.generateStreamToken);
 
 // Call status & signaling
 router.get('/status', requireAuth, callCtrl.getCallStatus);
+router.get('/check-active', callCtrl.checkActiveCallsForUser);
 router.post('/signal', requireAuth, callCtrl.handleCallSignal);
 
 module.exports = router;
