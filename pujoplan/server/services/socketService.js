@@ -124,47 +124,84 @@ function initSocket(server, clientUrl) {
   io.on('connection', (socket) => {
     const user = socket.user || { uid: 'anonymous' };
     const uid = user.uid || user.id;
+    const email = (user.email || '').toLowerCase().trim();
     console.log(`[Socket] ⚡ User connected: ${user.name || uid} (${socket.id})`);
 
     // Personal user rooms for targeted direct calls and notifications
-    if (uid) socket.join(`user:${uid}`);
-    if (user.id && user.id !== uid) socket.join(`user:${user.id}`);
-    if (user._id && String(user._id) !== uid && String(user._id) !== user.id) socket.join(`user:${String(user._id)}`);
-    if (email) socket.join(`user:email:${email}`);
-
-    // Auto-join all groups this user belongs to
-    const uids = [user.uid, user.id, user._id ? String(user._id) : null].filter(Boolean);
-
-    const orConditions = [
-      { memberUids: { $in: uids } },
-      { adminId: { $in: uids } },
-      { 'admin.id': { $in: uids } },
-      { 'members.userId': { $in: uids } },
-      { 'members.user.id': { $in: uids } },
-    ];
+    if (uid) {
+      socket.join(`user:${uid}`);
+      socket.join(uid);
+    }
+    if (user.id && user.id !== uid) {
+      socket.join(`user:${user.id}`);
+      socket.join(user.id);
+    }
+    if (user._id && String(user._id) !== uid && String(user._id) !== user.id) {
+      socket.join(`user:${String(user._id)}`);
+      socket.join(String(user._id));
+    }
     if (email) {
-      orConditions.push(
-        { 'admin.email': { $regex: new RegExp(`^${email}$`, 'i') } },
-        { 'members.user.email': { $regex: new RegExp(`^${email}$`, 'i') } }
-      );
+      socket.join(`user:email:${email}`);
+      socket.join(`user:${email}`);
+      socket.join(email);
     }
 
-    if (uids.length > 0 && !uids.every(u => u.startsWith('guest_') || u === 'anonymous')) {
-      Group.find({ $or: orConditions })
-        .then((groups) => {
+    // Function to join all groups for a user
+    const autoJoinUserGroups = async (targetUser) => {
+      const u = targetUser || user;
+      const uids = [u.uid, u.id, u._id ? String(u._id) : null].filter(Boolean);
+      const userEmail = (u.email || '').toLowerCase().trim();
+
+      const orConditions = [
+        { memberUids: { $in: uids } },
+        { adminId: { $in: uids } },
+        { 'admin.id': { $in: uids } },
+        { 'members.userId': { $in: uids } },
+        { 'members.user.id': { $in: uids } },
+      ];
+      if (userEmail) {
+        orConditions.push(
+          { 'admin.email': { $regex: new RegExp(`^${userEmail}$`, 'i') } },
+          { 'members.user.email': { $regex: new RegExp(`^${userEmail}$`, 'i') } }
+        );
+      }
+
+      if (uids.length > 0 && !uids.every(u => String(u).startsWith('guest_') || u === 'anonymous')) {
+        try {
+          const groups = await Group.find({ $or: orConditions });
           if (Array.isArray(groups)) {
             groups.forEach((g) => {
-              // Use the custom 'id' field (grp_xxx), not Mongoose's virtual _id
               const groupId = g.get('id') || g._doc?.id;
               if (groupId) socket.join(`group:${groupId}`);
             });
             if (groups.length > 0) {
-              console.log(`[Socket] 🚪 Auto-joined ${groups.length} group rooms for ${user.name || uid}`);
+              console.log(`[Socket] 🚪 Auto-joined ${groups.length} group rooms for ${u.name || uid}`);
             }
           }
-        })
-        .catch(() => {});
-    }
+        } catch (_) {}
+      }
+    };
+
+    autoJoinUserGroups(user);
+
+    // Allow client to register or update user identity after initial connection
+    socket.on('register_user', (userData) => {
+      if (!userData) return;
+      const regUid = userData.uid || userData.id || userData._id;
+      const regEmail = (userData.email || '').toLowerCase().trim();
+      if (regUid) {
+        socket.join(`user:${regUid}`);
+        socket.join(regUid);
+        if (userData.id) socket.join(`user:${userData.id}`);
+        if (userData._id) socket.join(`user:${String(userData._id)}`);
+      }
+      if (regEmail) {
+        socket.join(`user:email:${regEmail}`);
+        socket.join(`user:${regEmail}`);
+        socket.join(regEmail);
+      }
+      autoJoinUserGroups(userData);
+    });
 
     // Join a specific group room
     socket.on('join_group', (groupId) => {

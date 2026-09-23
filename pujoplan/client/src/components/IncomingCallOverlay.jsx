@@ -102,6 +102,20 @@ export default function IncomingCallOverlay() {
     if (!user) return;
     const socket = getSocket();
 
+    const doRegister = () => {
+      socket.emit('register_user', {
+        id: user.id || user.userId || user.uid || user._id,
+        uid: user.uid || user.id || user._id,
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+      });
+    };
+
+    doRegister();
+    socket.on('connect', doRegister);
+    socket.on('reconnect', doRegister);
+
     const handleIncomingCallSocket = (data) => {
       console.log('[IncomingCallOverlay] 📞 Socket incomingCall event received:', data);
       if (data && data.groupId) {
@@ -134,6 +148,8 @@ export default function IncomingCallOverlay() {
     socket.on('callEnded', handleCallEndedSocket);
 
     return () => {
+      socket.off('connect', doRegister);
+      socket.off('reconnect', doRegister);
       socket.off('incomingCall', handleIncomingCallSocket);
       socket.off('call_signal', handleCallSignalSocket);
       socket.off('callEnded', handleCallEndedSocket);
