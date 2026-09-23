@@ -103,6 +103,14 @@
   overscroll-behavior-y: contain;
 }
 
+.app-shell--no-scroll .app-main {
+  overflow: hidden !important;
+  height: calc(100vh - var(--header-h));
+  height: calc(100dvh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+}
+
 /* ── Bottom navigation ──────────────────── */
 .bottom-nav {
   position: sticky;

@@ -1022,25 +1022,47 @@ export default function GroupDashboard() {
     .sort((a, b) => b.voteCount - a.voteCount);
 
   const activeMembers = locations.filter(m => m.isSharingLocation && m.latitude && m.longitude);
+  // Android hardware back key listener: if on chat, ai, or route tab, switch back to 'plan' tab
+  useEffect(() => {
+    const handleAppBack = (e) => {
+      if (activeTab !== 'plan') {
+        e.preventDefault();
+        setActiveTab('plan');
+      }
+    };
+    window.addEventListener('app:back', handleAppBack);
+    return () => window.removeEventListener('app:back', handleAppBack);
+  }, [activeTab]);
+
   const activeSharingCount = activeMembers.length;
+  const isFullChatView = activeTab === 'chat' || activeTab === 'ai';
 
   return (
-    <AppLayout title={group?.name || 'Group Plan'} back onBack={() => navigate('/groups')}>
-      <div className="page-wrap gd">
-        <button className="back-nav-btn" onClick={() => navigate('/groups')}>
-          <ArrowLeft size={16} /> Back to Group Plans
-        </button>
+    <AppLayout
+      title={group?.name || 'Group Plan'}
+      back
+      onBack={() => navigate('/groups')}
+      noScroll={isFullChatView}
+    >
+      <div className={`page-wrap gd ${isFullChatView ? 'gd--full-chat' : ''}`}>
+        {!isFullChatView && (
+          <>
+            <button className="back-nav-btn" onClick={() => navigate('/groups')}>
+              <ArrowLeft size={16} /> Back to Group Plans
+            </button>
 
-        {/* Meta */}
-        <div className="gd__meta">
-          <span>{(group?.members || []).length} members</span>
-          <span>·</span>
-          <span>{(group?.spots || []).length} spots</span>
-          {group?.visitDate && <><span>·</span><span>{group.visitDate}</span></>}
-          <span className={`badge badge-${isAdmin ? 'yellow' : 'gray'}`} style={{ marginLeft: 'auto' }}>
-            {group?.myRole || 'member'}
-          </span>
-        </div>
+            {/* Meta */}
+            <div className="gd__meta">
+              <span>{(group?.members || []).length} members</span>
+              <span>·</span>
+              <span>{(group?.spots || []).length} spots</span>
+              {group?.visitDate && <><span>·</span><span>{group.visitDate}</span></>}
+              <span className={`badge badge-${isAdmin ? 'yellow' : 'gray'}`} style={{ marginLeft: 'auto' }}>
+                {group?.myRole || 'member'}
+              </span>
+            </div>
+          </>
+        )}
 
         {/* Segmented Navigation Tabs: Plan, Route, AI, Chat */}
         <div className="gd__tabs">
@@ -1370,7 +1392,7 @@ export default function GroupDashboard() {
 
         {/* ── 3. AI Assistant Tab (Distance & Route Bot) ── */}
         {activeTab === 'ai' && (
-          <div className="gd__tab-pane" style={{ marginTop: 2 }}>
+          <div className="gd__tab-pane gd__tab-pane--fullscreen">
             <DistanceChatbot
               embedded={true}
               groupSpots={group?.spots ? group.spots.map(s => s.spot || s) : []}
@@ -1383,7 +1405,7 @@ export default function GroupDashboard() {
 
         {/* ── 4. Chat Tab (Friends Group Chat) ── */}
         {activeTab === 'chat' && (
-          <div className="gd__tab-pane">
+          <div className="gd__tab-pane gd__tab-pane--fullscreen">
             <GroupChat groupId={id} currentUser={user} />
           </div>
         )}

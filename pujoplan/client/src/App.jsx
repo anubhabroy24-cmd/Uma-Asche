@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 import Landing from './pages/Landing';
@@ -92,6 +92,60 @@ function PrivateRoute({ children, splashDone }) {
 
 function AppRoutes() {
   const [splashDone, setSplashDone] = React.useState(false);
+  const [exitToast, setExitToast] = React.useState(false);
+  const navigate = useNavigate();
+  const lastBackPressRef = React.useRef(0);
+
+  // Android hardware / gesture back button handler
+  React.useEffect(() => {
+    let backListener = null;
+
+    const setupListener = async () => {
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+
+        backListener = await CapApp.addListener('backButton', () => {
+          // 1. Dispatch custom event to let active overlays/modals/tabs handle back first
+          const backEvent = new CustomEvent('app:back', { cancelable: true });
+          const isPrevented = !window.dispatchEvent(backEvent);
+          if (isPrevented) {
+            return; // Handled by photo lightbox, modal, or tab switch
+          }
+
+          // 2. Check current route
+          const currentPath = window.location.pathname;
+          const isRoot = currentPath === '/' || currentPath === '/dashboard';
+
+          if (!isRoot) {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate('/dashboard');
+            }
+            return;
+          }
+
+          // 3. At root (/dashboard or /): prompt before exiting app
+          const now = Date.now();
+          if (now - lastBackPressRef.current < 2000) {
+            CapApp.exitApp();
+          } else {
+            lastBackPressRef.current = now;
+            setExitToast(true);
+            setTimeout(() => setExitToast(false), 2000);
+          }
+        });
+      } catch (_) {}
+    };
+
+    setupListener();
+
+    return () => {
+      if (backListener && backListener.remove) {
+        backListener.remove();
+      }
+    };
+  }, [navigate]);
 
   React.useEffect(() => {
     // Request push & local notification permissions on app launch
@@ -108,6 +162,27 @@ function AppRoutes() {
   return (
     <>
       <IncomingCallOverlay />
+      {exitToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(24, 24, 27, 0.96)',
+          color: '#f4f4f5',
+          padding: '9px 18px',
+          borderRadius: '9999px',
+          fontSize: '0.84rem',
+          fontWeight: 600,
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.7)',
+          zIndex: 99999,
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap'
+        }}>
+          Press back again to exit
+        </div>
+      )}
       <Routes>
         {/* Public */}
         <Route path="/" element={<PublicRoute splashDone={splashDone}><Landing showButton={true} /></PublicRoute>} />

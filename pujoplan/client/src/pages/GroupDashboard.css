@@ -64,6 +64,28 @@
   animation: gdFadeIn 0.2s ease-out;
 }
 
+.gd__tab-pane--fullscreen {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.gd--full-chat {
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.gd--full-chat .gd__tabs {
+  margin: 8px 12px 6px !important;
+  flex-shrink: 0;
+}
+
 @keyframes gdFadeIn {
   from {
     opacity: 0;

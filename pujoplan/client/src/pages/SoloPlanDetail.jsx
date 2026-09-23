@@ -269,21 +269,44 @@ export default function SoloPlanDetail() {
     </AppLayout>
   );
 
-  return (
-    <AppLayout title={plan.name} back onBack={() => navigate('/solo')}>
-      <div className="page-wrap spd">
-        <button className="back-nav-btn" onClick={() => navigate('/solo')}>
-          <ArrowLeft size={16} /> Back to Solo Plans
-        </button>
+  // Android hardware back key listener: if on ai or route tab, switch back to 'plan' tab
+  React.useEffect(() => {
+    const handleAppBack = (e) => {
+      if (activeTab !== 'plan') {
+        e.preventDefault();
+        setActiveTab('plan');
+      }
+    };
+    window.addEventListener('app:back', handleAppBack);
+    return () => window.removeEventListener('app:back', handleAppBack);
+  }, [activeTab]);
 
-        {/* Meta */}
-        <div className="spd__meta">
-          {plan.visitDate && <span>{plan.visitDate}</span>}
-          {plan.visitDate && plan.startLocation && <span>·</span>}
-          {plan.startLocation && <span>From: {plan.startLocation}</span>}
-          <span>·</span>
-          <span>{plan.spots.length} pandals</span>
-        </div>
+  const isFullChatView = activeTab === 'ai';
+
+  return (
+    <AppLayout
+      title={plan.name}
+      back
+      onBack={() => navigate('/solo')}
+      noScroll={isFullChatView}
+    >
+      <div className={`page-wrap spd ${isFullChatView ? 'gd--full-chat' : ''}`}>
+        {!isFullChatView && (
+          <>
+            <button className="back-nav-btn" onClick={() => navigate('/solo')}>
+              <ArrowLeft size={16} /> Back to Solo Plans
+            </button>
+
+            {/* Meta */}
+            <div className="spd__meta">
+              {plan.visitDate && <span>{plan.visitDate}</span>}
+              {plan.visitDate && plan.startLocation && <span>·</span>}
+              {plan.startLocation && <span>From: {plan.startLocation}</span>}
+              <span>·</span>
+              <span>{plan.spots.length} pandals</span>
+            </div>
+          </>
+        )}
 
         {/* ── Tabs ── */}
         <div className="gd__tabs">
@@ -442,7 +465,7 @@ export default function SoloPlanDetail() {
 
         {/* ── 3. AI Tab ── */}
         {activeTab === 'ai' && (
-          <div className="gd__tab-pane" style={{ marginTop: 2 }}>
+          <div className="gd__tab-pane gd__tab-pane--fullscreen">
             <DistanceChatbot
               embedded={true}
               groupSpots={plan?.spots ? plan.spots.map(ps => ps.spot || ps) : []}

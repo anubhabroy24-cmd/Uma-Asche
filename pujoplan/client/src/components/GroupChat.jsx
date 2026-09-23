@@ -184,6 +184,7 @@ export default function GroupChat({ groupId, currentUser }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const messagesEndRef = useRef(null);
+  const feedContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const isInitialLoadRef = useRef(true);
   const currentUserRef = useRef(currentUser);
@@ -191,6 +192,21 @@ export default function GroupChat({ groupId, currentUser }) {
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  // Close lightbox modal or clear selected photo on Android hardware back button
+  useEffect(() => {
+    const handleAppBack = (e) => {
+      if (previewPhotoModal) {
+        e.preventDefault();
+        setPreviewPhotoModal(null);
+      } else if (selectedPhoto) {
+        e.preventDefault();
+        setSelectedPhoto(null);
+      }
+    };
+    window.addEventListener('app:back', handleAppBack);
+    return () => window.removeEventListener('app:back', handleAppBack);
+  }, [previewPhotoModal, selectedPhoto]);
 
   // ── Call (Voice & Video) State with Stream ──
   const [callActive, setCallActive] = useState(false);
@@ -328,9 +344,14 @@ export default function GroupChat({ groupId, currentUser }) {
   }, [fetchMessages, groupId]);
 
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages inside the chat container ONLY (prevents outer page scrolling)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (feedContainerRef.current) {
+      feedContainerRef.current.scrollTo({
+        top: feedContainerRef.current.scrollHeight,
+        behavior: isInitialLoadRef.current ? 'auto' : 'smooth'
+      });
+    }
   }, [messages]);
 
   // ── Poll Call Status ──
@@ -617,7 +638,7 @@ export default function GroupChat({ groupId, currentUser }) {
       )}
 
       {/* Messages Feed */}
-      <div className="gc__feed">
+      <div className="gc__feed" ref={feedContainerRef}>
         {messages.length === 0 ? (
           <div className="gc__empty">
             <div className="gc__empty-icon">

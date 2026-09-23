@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
 import './AppLayout.css';
 
-export default function AppLayout({ children, title, back, onBack, theme = '' }) {
+export default function AppLayout({ children, title, back, onBack, theme = '', noScroll = false }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showSignOut, setShowSignOut] = useState(false);
@@ -15,7 +15,7 @@ export default function AppLayout({ children, title, back, onBack, theme = '' })
   }
 
   return (
-    <div className={`app-shell ${theme ? `app-shell--${theme}` : ''}`}>
+    <div className={`app-shell ${theme ? `app-shell--${theme}` : ''} ${noScroll ? 'app-shell--no-scroll' : ''}`}>
       <div className="app-shell__bg-art" aria-hidden="true" />
       {/* ── Top header ── */}
       <header className="app-header">

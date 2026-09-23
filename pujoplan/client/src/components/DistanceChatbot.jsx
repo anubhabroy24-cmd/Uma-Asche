@@ -105,11 +105,17 @@ export default function DistanceChatbot({
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState('');
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const localCacheRef = useRef(new Map());
 
-  // Auto scroll to bottom
+  // Auto scroll inside chatbot message container ONLY (prevents outer page scrolling)
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
   };
 
   useEffect(() => {
@@ -118,27 +124,24 @@ export default function DistanceChatbot({
     }
   }, [messages, isOpen, isTyping]);
 
-  // Native Android Hardware / Gesture Back Button handling
+  // Native Android Hardware / Gesture Back Button handling for floating mode
   useEffect(() => {
-    if (!isOpen) return;
+    if (embedded || !isOpen) return;
 
-    // Push history state so Android back button closes the bot instead of leaving the app
-    window.history.pushState({ modal: 'distbot' }, '');
-
-    const handlePopState = () => {
+    const handleAppBack = (e) => {
+      e.preventDefault();
       setIsOpen(false);
     };
 
-    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('app:back', handleAppBack);
     return () => {
-      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('app:back', handleAppBack);
     };
-  }, [isOpen]);
+  }, [isOpen, embedded]);
 
   const handleClose = () => {
-    setIsOpen(false);
-    if (window.history.state?.modal === 'distbot') {
-      window.history.back();
+    if (!embedded) {
+      setIsOpen(false);
     }
   };
 
@@ -355,7 +358,7 @@ export default function DistanceChatbot({
           </div>
 
           {/* Messages Stream */}
-          <div className="distbot-messages">
+          <div className="distbot-messages" ref={messagesContainerRef}>
             {messages.map((m) => (
               <div key={m.id} className={`distbot-msg distbot-msg--${m.sender}`}>
                 {m.sender === 'user' ? (
