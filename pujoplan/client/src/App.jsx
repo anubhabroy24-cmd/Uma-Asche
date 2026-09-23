@@ -15,6 +15,7 @@ import GroupPlans from './pages/GroupPlans';
 import PandalMapPage from './pages/PandalMapPage';
 
 import IncomingCallOverlay from './components/IncomingCallOverlay';
+import PermissionModal from './components/PermissionModal';
 
 // Branded full-screen splash loader with logo and spinner
 function SplashLoader() {
@@ -161,6 +162,7 @@ function AppRoutes() {
 
   return (
     <>
+      <PermissionModal />
       <IncomingCallOverlay />
       {exitToast && (
         <div style={{

@@ -1,0 +1,207 @@
+.perm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 18px;
+  animation: permFadeIn 0.25s ease-out;
+}
+
+@keyframes permFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.perm-modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(165deg, #181820 0%, #101016 100%);
+  border: 1px solid rgba(255, 204, 0, 0.25);
+  border-radius: 20px;
+  padding: 24px 20px;
+  color: #ffffff;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 204, 0, 0.12);
+  animation: permSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+@keyframes permSlideUp {
+  from {
+    transform: translateY(24px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.perm-modal-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.perm-modal-icon-badge {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  background: radial-gradient(circle, rgba(255, 204, 0, 0.2) 0%, rgba(255, 102, 0, 0.1) 100%);
+  border: 1px solid rgba(255, 204, 0, 0.4);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 4px 16px rgba(255, 204, 0, 0.2);
+}
+
+.perm-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffcc00;
+  margin: 0 0 6px;
+  letter-spacing: -0.3px;
+}
+
+.perm-modal-subtitle {
+  font-size: 0.82rem;
+  color: #a1a1aa;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.perm-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.perm-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+}
+
+.perm-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.15rem;
+}
+
+.perm-item-icon--notif {
+  background: rgba(255, 75, 75, 0.16);
+  color: #ff5252;
+  border: 1px solid rgba(255, 75, 75, 0.3);
+}
+
+.perm-item-icon--loc {
+  background: rgba(66, 133, 244, 0.16);
+  color: #4285f4;
+  border: 1px solid rgba(66, 133, 244, 0.3);
+}
+
+.perm-item-icon--call {
+  background: rgba(52, 168, 83, 0.16);
+  color: #34a853;
+  border: 1px solid rgba(52, 168, 83, 0.3);
+}
+
+.perm-item-content {
+  flex: 1;
+}
+
+.perm-item-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.perm-item-status {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.perm-item-status--granted {
+  background: rgba(52, 168, 83, 0.2);
+  color: #4ade80;
+}
+
+.perm-item-status--needed {
+  background: rgba(255, 204, 0, 0.15);
+  color: #facc15;
+}
+
+.perm-item-desc {
+  font-size: 0.74rem;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.38;
+}
+
+.perm-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.perm-btn-allow {
+  width: 100%;
+  padding: 13px 18px;
+  background: linear-gradient(135deg, #ffcc00 0%, #ff9900 100%);
+  color: #000000;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 18px rgba(255, 180, 0, 0.35);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.perm-btn-allow:active {
+  transform: scale(0.98);
+  filter: brightness(0.95);
+}
+
+.perm-btn-later {
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  color: #71717a;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.15s ease;
+}
+
+.perm-btn-later:hover,
+.perm-btn-later:active {
+  color: #d4d4d8;
+}

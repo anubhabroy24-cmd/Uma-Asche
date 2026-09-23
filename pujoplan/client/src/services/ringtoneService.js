@@ -82,7 +82,7 @@ function getRingAudioElement() {
 }
 
 // Pre-unlock AudioContext and Audio Element on any user interaction
-function unlockAudio() {
+export function unlockAudio() {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (AudioContextClass) {
