@@ -15,7 +15,6 @@ import GroupPlans from './pages/GroupPlans';
 import PandalMapPage from './pages/PandalMapPage';
 
 import IncomingCallOverlay from './components/IncomingCallOverlay';
-import PermissionModal from './components/PermissionModal';
 
 // Branded full-screen splash loader with logo and spinner
 function SplashLoader() {
@@ -149,10 +148,29 @@ function AppRoutes() {
   }, [navigate]);
 
   React.useEffect(() => {
-    // Request push & local notification permissions on app launch
+    // 1. Initialize notification channel & request notification permission directly with system
     import('./services/notificationService')
-      .then(m => m.requestNotificationPermission())
-      .catch(() => { });
+      .then(m => {
+        m.requestNotificationPermission();
+        m.createCallNotificationChannel();
+      })
+      .catch(() => {});
+
+    // 2. Pre-unlock AudioContext & ringtone engine on first launch
+    import('./services/ringtoneService')
+      .then(m => {
+        if (m.unlockAudio) m.unlockAudio();
+      })
+      .catch(() => {});
+
+    // 3. Request initial GPS location with system so location is on and active immediately
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => {},
+        () => {},
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
 
     const timer = setTimeout(() => {
       setSplashDone(true);
@@ -162,7 +180,6 @@ function AppRoutes() {
 
   return (
     <>
-      <PermissionModal />
       <IncomingCallOverlay />
       {exitToast && (
         <div style={{

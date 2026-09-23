@@ -24,6 +24,8 @@ public class MainActivity extends BridgeActivity {
                 settings.setMediaPlaybackRequiresUserGesture(false);
                 settings.setDomStorageEnabled(true);
                 settings.setDatabaseEnabled(true);
+                settings.setGeolocationEnabled(true);
+                settings.setGeolocationDatabasePath(getFilesDir().getPath());
             }
         } catch (Exception ignored) {}
 
