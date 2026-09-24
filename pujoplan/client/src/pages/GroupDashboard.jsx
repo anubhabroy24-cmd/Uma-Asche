@@ -13,6 +13,7 @@ import {
   finalizeGroupSpot, generateGroupRoute,
   removeMember, leaveGroup, regenerateInvite, deleteGroup,
   getGroupLocations, updateGroupLocation, deduplicateMembers,
+  saveLocalGroups, getLocalGroups,
 } from '../services/api';
 import { getReliableCurrentLocation } from '../services/routingService';
 import {
@@ -546,8 +547,8 @@ export default function GroupDashboard() {
         if (isMeRemoved) {
           try {
             localStorage.removeItem(`pp_shared_group_${id}`);
-            const remaining = (JSON.parse(localStorage.getItem('pp_local_groups') || '[]')).filter(g => g.id !== id);
-            localStorage.setItem('pp_local_groups', JSON.stringify(remaining));
+            const remaining = getLocalGroups().filter(g => g.id !== id);
+            saveLocalGroups(remaining);
           } catch (_) { }
 
           navigate('/groups', { replace: true });
@@ -1047,13 +1048,8 @@ export default function GroupDashboard() {
       await deleteGroup(id);
       try {
         localStorage.removeItem(`pp_shared_group_${id}`);
-        const localGroups = (JSON.parse(localStorage.getItem('pp_local_groups') || '[]')).filter(g => g.id !== id);
-        localStorage.setItem('pp_local_groups', JSON.stringify(localGroups));
-        if (currentUserId) {
-          const uKey = `pp_local_groups_${currentUserId}`;
-          const uGroups = (JSON.parse(localStorage.getItem(uKey) || '[]')).filter(g => g.id !== id);
-          localStorage.setItem(uKey, JSON.stringify(uGroups));
-        }
+        const localGroups = getLocalGroups().filter(g => g.id !== id);
+        saveLocalGroups(localGroups);
       } catch (_) { }
 
       navigate('/groups', { replace: true });

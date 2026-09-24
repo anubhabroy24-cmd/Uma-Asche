@@ -147,7 +147,7 @@ function AppRoutes() {
     };
   }, [navigate]);
 
-  // Handle incoming call answer or popup from native Android
+  // Handle incoming call answer from native Android
   React.useEffect(() => {
     const handleNativeAnswer = (e) => {
       const detail = e.detail || {};
@@ -155,17 +155,9 @@ function AppRoutes() {
         navigate(`/group/${detail.groupId}?tab=chat&call=join&mode=${detail.callMode || 'video'}`);
       }
     };
-    const handleNativeIncoming = (e) => {
-      const detail = e.detail || {};
-      if (detail.groupId && !window.location.pathname.includes(detail.groupId)) {
-        navigate(`/group/${detail.groupId}?tab=chat`);
-      }
-    };
     window.addEventListener('native:answer_call', handleNativeAnswer);
-    window.addEventListener('native:incoming_call', handleNativeIncoming);
     return () => {
       window.removeEventListener('native:answer_call', handleNativeAnswer);
-      window.removeEventListener('native:incoming_call', handleNativeIncoming);
     };
   }, [navigate]);
 

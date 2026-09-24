@@ -241,16 +241,14 @@ public class MainActivity extends BridgeActivity {
     private void handleIncomingCallIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getStringExtra("call_action");
-        if ("answer".equals(action) || "incoming".equals(action)) {
+        if ("answer".equals(action)) {
             String groupId = intent.getStringExtra("groupId");
             String callMode = intent.getStringExtra("callMode");
             String callerName = intent.getStringExtra("callerName");
             String callId = intent.getStringExtra("callId");
 
-            // Stop ringtone and dismiss notification immediately if user answered
-            if ("answer".equals(action)) {
-                CallNotificationHelper.dismissCall(this);
-            }
+            // Stop ringtone and dismiss notification immediately when user answers
+            CallNotificationHelper.dismissCall(this);
 
             if (this.bridge != null && this.bridge.getWebView() != null) {
                 WebView webView = this.bridge.getWebView();

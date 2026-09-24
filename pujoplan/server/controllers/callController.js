@@ -142,6 +142,26 @@ async function handleCallSignal(req, res, next) {
       email: user.email || null,
     };
 
+function isGenericEmail(email) {
+  if (!email || typeof email !== 'string') return true;
+  const e = email.toLowerCase().trim();
+  return (
+    !e ||
+    e === 'user@pujoplan.app' ||
+    e === 'demo@pujoplan.dev' ||
+    e === 'anonymous' ||
+    e.endsWith('@pujoplan.app') ||
+    e.endsWith('@pujoplan.dev') ||
+    !e.includes('@')
+  );
+}
+
+function isInvalidUid(uid) {
+  if (!uid || typeof uid !== 'string') return true;
+  const u = uid.trim().toLowerCase();
+  return !u || u === 'local-user' || u === 'anonymous' || u === 'undefined' || u === 'null' || u.startsWith('guest_');
+}
+
     const targetCallId = callId || channelName || `group_${groupId}`;
     const grp = await Group.findOne({ id: groupId }).catch(() => null);
     const groupName = grp?.name || 'Puja Group';
@@ -150,19 +170,22 @@ async function handleCallSignal(req, res, next) {
     const getMemberIdentifiers = () => {
       const ids = new Set();
       if (!grp) return ids;
-      if (grp.adminId) ids.add(grp.adminId);
-      if (grp.admin?.id) ids.add(grp.admin.id);
+      if (grp.adminId && !isInvalidUid(grp.adminId)) ids.add(grp.adminId);
+      if (grp.admin?.id && !isInvalidUid(grp.admin.id)) ids.add(grp.admin.id);
       if (Array.isArray(grp.memberUids)) {
-        grp.memberUids.forEach(uid => uid && ids.add(uid));
+        grp.memberUids.forEach(uid => {
+          if (uid && !isInvalidUid(uid) && !isGenericEmail(uid)) ids.add(uid);
+        });
       }
       if (Array.isArray(grp.members)) {
         grp.members.forEach(m => {
-          if (m.userId) ids.add(m.userId);
-          if (m.user?.id) ids.add(m.user.id);
-          if (m.user?.email) ids.add(`email:${m.user.email.toLowerCase().trim()}`);
+          if (m.userId && !isInvalidUid(m.userId)) ids.add(m.userId);
+          if (m.user?.id && !isInvalidUid(m.user.id)) ids.add(m.user.id);
+          const mEmail = m.user?.email || m.email;
+          if (mEmail && !isGenericEmail(mEmail)) ids.add(`email:${mEmail.toLowerCase().trim()}`);
         });
       }
-      if (grp.admin?.email) {
+      if (grp.admin?.email && !isGenericEmail(grp.admin.email)) {
         ids.add(`email:${grp.admin.email.toLowerCase().trim()}`);
       }
       return ids;
@@ -335,14 +358,18 @@ async function checkActiveCallsForUser(req, res) {
     let userId = req.query.userId || req.user?.id || req.user?.uid;
     let userEmail = req.query.email ? String(req.query.email).trim().toLowerCase() : (req.user?.email ? String(req.user.email).trim().toLowerCase() : null);
 
+    if (isInvalidUid(userId)) userId = null;
+    if (isGenericEmail(userEmail)) userEmail = null;
+
     // If not in query or req.user, check Authorization header if present
     if (!userId && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       try {
         const token = req.headers.authorization.slice(7).trim();
         const jwtPayload = jwt.decode(token);
         if (jwtPayload) {
-          userId = jwtPayload.uid || jwtPayload.id || jwtPayload.sub;
-          if (!userEmail && jwtPayload.email) {
+          const jwtUid = jwtPayload.uid || jwtPayload.id || jwtPayload.sub;
+          if (!isInvalidUid(jwtUid)) userId = jwtUid;
+          if (!userEmail && jwtPayload.email && !isGenericEmail(jwtPayload.email)) {
             userEmail = String(jwtPayload.email).trim().toLowerCase();
           }
         }
@@ -361,22 +388,28 @@ async function checkActiveCallsForUser(req, res) {
     }
 
     for (const call of calls) {
-      // Auto-expire ringing calls older than 60s
       const callTime = new Date(call.updatedAt || call.createdAt).getTime();
-      if (call.status === 'ringing' && (now - callTime) > 60000) {
+
+      // Auto-expire ringing calls older than 45s
+      if (call.status === 'ringing' && (now - callTime) > 45000) {
+        Call.updateOne({ _id: call._id }, { status: 'ended' }).exec().catch(() => {});
+        continue;
+      }
+      // Auto-expire active calls older than 30 mins
+      if (call.status === 'active' && (now - callTime) > 30 * 60 * 1000) {
         Call.updateOne({ _id: call._id }, { status: 'ended' }).exec().catch(() => {});
         continue;
       }
 
       // If caller is the user themselves, skip
       const callerId = call.caller?.id || call.caller?.userId;
-      const callerEmail = call.caller?.email ? String(call.caller.email).toLowerCase().trim() : null;
+      const callerEmail = (call.caller?.email && !isGenericEmail(call.caller.email)) ? String(call.caller.email).toLowerCase().trim() : null;
       if ((userId && callerId === userId) || (userEmail && callerEmail && userEmail === callerEmail)) {
         continue;
       }
 
       // Check if user is already participating in this call
-      if (Array.isArray(call.candidates) && call.candidates.some(c => (c.id || c.userId) === userId || (userEmail && c.email && c.email.toLowerCase() === userEmail))) {
+      if (Array.isArray(call.candidates) && call.candidates.some(c => (c.id || c.userId) === userId || (userEmail && c.email && !isGenericEmail(c.email) && c.email.toLowerCase() === userEmail))) {
         continue;
       }
 
@@ -384,15 +417,16 @@ async function checkActiveCallsForUser(req, res) {
       const grp = await Group.findOne({ id: call.groupId }).select('id name adminId admin memberUids members').lean();
       if (!grp) continue;
 
-      const adminEmail = grp.admin?.email ? String(grp.admin.email).toLowerCase().trim() : null;
+      const adminEmail = (grp.admin?.email && !isGenericEmail(grp.admin.email)) ? String(grp.admin.email).toLowerCase().trim() : null;
       const isMember =
-        (userId && grp.adminId === userId) ||
-        (userEmail && adminEmail === userEmail) ||
+        (userId && (grp.adminId === userId || grp.admin?.id === userId)) ||
+        (userEmail && adminEmail && adminEmail === userEmail) ||
         (userId && Array.isArray(grp.memberUids) && grp.memberUids.includes(userId)) ||
         (Array.isArray(grp.members) && grp.members.some(m => {
           const mId = m.userId || m.id || m.user?.id;
-          const mEmail = m.user?.email ? String(m.user.email).toLowerCase().trim() : null;
-          return (userId && mId === userId) || (userEmail && mEmail === userEmail);
+          const mEmail = (m.user?.email || m.email) ? String(m.user?.email || m.email).toLowerCase().trim() : null;
+          return (userId && mId && !isInvalidUid(mId) && mId === userId) ||
+                 (userEmail && mEmail && !isGenericEmail(mEmail) && userEmail === mEmail);
         }));
 
       if (isMember) {

@@ -85,14 +85,28 @@ function getStoredUser() {
     }
   } catch (_) { }
 
-  const fallbackId = gEmail ? `user_${gEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'local-user';
+  const fallbackId = gEmail && !isGenericEmail(gEmail) ? `user_${gEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'local-user';
 
   return {
     id: fallbackId,
     name: gName || (gEmail ? gEmail.split('@')[0] : 'Pujo Explorer'),
-    email: gEmail || 'user@pujoplan.app',
+    email: gEmail || '',
     profileImage: gPhoto || null,
   };
+}
+
+export function isGenericEmail(email) {
+  if (!email || typeof email !== 'string') return true;
+  const e = email.toLowerCase().trim();
+  return (
+    !e ||
+    e === 'user@pujoplan.app' ||
+    e === 'demo@pujoplan.dev' ||
+    e === 'anonymous' ||
+    e.endsWith('@pujoplan.app') ||
+    e.endsWith('@pujoplan.dev') ||
+    !e.includes('@')
+  );
 }
 
 function isSameUser(member, user) {
@@ -105,9 +119,12 @@ function isSameUser(member, user) {
   const uFid = user.firebaseUid;
   const uEmail = (user.email || '').toLowerCase().trim();
 
-  if (mUid && (mUid === uUid || mUid === uFid)) return true;
-  if (mFid && (mFid === uUid || mFid === uFid)) return true;
-  if (mEmail && uEmail && mEmail === uEmail) return true;
+  const isValidUid = (id) => id && id !== 'local-user' && id !== 'anonymous' && !String(id).startsWith('guest_');
+  const isValidEmail = (e) => e && e.includes('@') && !isGenericEmail(e);
+
+  if (isValidUid(mUid) && (mUid === uUid || mUid === uFid)) return true;
+  if (isValidUid(mFid) && (mFid === uUid || mFid === uFid)) return true;
+  if (isValidEmail(mEmail) && isValidEmail(uEmail) && mEmail === uEmail) return true;
   return false;
 }
 
@@ -215,7 +232,8 @@ export function getLocalGroups() {
     const filtered = Array.from(groupMap.values()).map(base => {
       const shared = getSharedGroup(base.id);
       const grp = shared || base;
-      const isAdmin = grp.adminId === uid || (grp.admin?.email && email && grp.admin.email.toLowerCase() === email);
+      const isAdmin = (uid && uid !== 'local-user' && uid !== 'anonymous' && (grp.adminId === uid || grp.admin?.id === uid)) ||
+        (!isGenericEmail(email) && grp.admin?.email && grp.admin.email.toLowerCase().trim() === email);
       const members = deduplicateMembers(grp.members || [], grp.adminId, grp.admin);
       const isMember = members.some(m => isSameUser(m, user));
 

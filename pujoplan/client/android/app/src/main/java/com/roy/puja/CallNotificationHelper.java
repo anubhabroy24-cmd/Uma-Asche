@@ -142,24 +142,6 @@ public class CallNotificationHelper {
         }
 
         manager.notify(CALL_NOTIFICATION_ID, builder.build());
-
-        // Attempt direct full screen popup over lockscreen or other apps
-        try {
-            Intent popIntent = new Intent(context, MainActivity.class);
-            popIntent.setAction("com.roy.puja.INCOMING_CALL");
-            popIntent.putExtra("call_action", "incoming");
-            popIntent.putExtra("groupId", groupId);
-            popIntent.putExtra("groupName", groupName);
-            popIntent.putExtra("callerName", callerName);
-            popIntent.putExtra("callMode", callMode);
-            popIntent.putExtra("callId", callId);
-            popIntent.addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK |
-                Intent.FLAG_ACTIVITY_CLEAR_TOP |
-                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-            );
-            context.startActivity(popIntent);
-        } catch (Exception ignored) {}
     }
 
     public static synchronized void dismissCall(Context context) {
