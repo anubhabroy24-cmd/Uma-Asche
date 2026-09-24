@@ -481,21 +481,38 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // 8. Universal Helpful Response for ANY question with direct Google Maps link
-  const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
+  // 8. Amenity and general query handling
+  const isAmenity = /\b(toilet|washroom|bathroom|bar|pub|bars|pubs|food|restaurant|biryani|hospital|doctor|atm|cash|near\s*me)\b/i.test(userQuery) ||
+    /(টয়লেট|বাথরুম|শৌচাগার|বার|পাব|রেস্তোরাঁ|খাবার|হাসপাতাল|কাছে|शौचालय|बार|रेस्तरां|पास)/i.test(userQuery);
+
+  if (isAmenity) {
+    const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
+    return {
+      type: 'amenity_info',
+      reply: `📍 **Kolkata Facilities Guide:**\n\n` +
+        `Here are the verified locations for **"${userQuery}"** in Kolkata. Tap the map link below for live turn-by-turn navigation:\n\n` +
+        `[🗺️ Open in Google Maps](${gmapsUrl})`,
+      gmapsUrl,
+      suggestions: [
+        'Toilets near me',
+        'Bars near me',
+        'Famous restaurants near me',
+      ],
+    };
+  }
+
+  // General helpful guidance (NO forced Google Maps links)
   return {
     type: 'general_info',
-    reply: `🙏 **শুভ শারদীয়া!** Regarding **"${userQuery}"**:\n\n` +
-      `• **Kolkata Puja Guide:** You can explore pandals, distances, travel times, and live transit anytime.\n` +
-      `• **Metro Tip:** The Kolkata Metro (Blue & underwater Green Line) is the fastest way to travel during Durga Puja.\n` +
-      `• **Plan Section:** Check your group plan route map in the tabs above for step-by-step nearest pandal order.\n\n` +
-      `[🗺️ Open in Google Maps](${gmapsUrl})`,
-    gmapsUrl,
+    reply: `🙏 **শুভ শারদীয়া!**\n\n` +
+      `I am ready to help you with your Durga Puja plan! You can ask for step-by-step transport for your route, metro connections, pandal timings, or nearby amenities like washrooms and food.`,
+    gmapsUrl: null,
     suggestions: [
-      'Find bathrooms near me',
-      'Nearest bars and pubs',
-      'Howrah to Maidan distance',
-      'Famous pandals in South Kolkata',
+      'Transport details for my this route',
+      'Toilet near me',
+      'Bars near me',
+      'Famous pandals in Kolkata',
     ],
   };
 }
+

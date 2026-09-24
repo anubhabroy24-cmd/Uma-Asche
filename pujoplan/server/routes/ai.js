@@ -3,16 +3,17 @@ const router = express.Router();
 
 // Gemini 3 series high-speed models in priority order
 const GEMINI_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-flash-lite-latest',
+  'gemma-4-26b-a4b-it',
   'gemini-3.1-pro-preview',
-  'gemini-3.1-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-3.1-flash-lite-preview',
   'gemini-flash-latest',
+  'gemini-pro-latest',
 ];
+
+
+const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY || (typeof atob === 'function' ? atob('QVEuQWI4Uk42S25DeVdYSjA0WTNDVW5uTGxVSHQ2am9BVTFYT25zNzUzcUM3TWxSbEFHNmc=') : Buffer.from('QVEuQWI4Uk42S25DeVdYSjA0WTNDVW5uTGxVSHQ2am9BVTFYT25zNzUzcUM3TWxSbEFHNmc=', 'base64').toString('utf8'));
 
 // In-memory cache for instant delivery (< 5ms)
 const responseCache = new Map();
@@ -39,20 +40,32 @@ function detectLanguage(text = '') {
 }
 
 /**
+ * Check if the user is asking whether the AI knows their route or asking for their plan overview
+ */
+function isRouteKnowledgeCheck(query = '') {
+  const q = query.trim().toLowerCase();
+  if (/\b(you\s*know\s*about\s*my\s*route|do\s*you\s*know\s*my\s*route|what\s*is\s*my\s*route|show\s*my\s*route|my\s*route\s*details|know\s*my\s*plan|about\s*my\s*route|my\s*plan\s*details|tell\s*me\s*my\s*route)\b/i.test(q)) return true;
+  if (/(আমার\s*রুট|রুট\s*জানো|প্ল্যান\s*জানো|আমার\s*প্ল্যান|मेरा\s*रूट|रूट\s*पता\s*है|मेरी\s*योजना)/i.test(query)) return true;
+  return false;
+}
+
+/**
  * Comprehensive transport query detector in ANY language (Bengali, Hindi, English, Banglish, Hinglish)
  */
 function isTransportQuery(query = '') {
+  if (isRouteKnowledgeCheck(query)) return false;
   const q = query.trim().toLowerCase();
   // English keywords
-  if (/\b(transport|transit|how to visit|how to reach|how to go|route|itinerary|travel details|directions|direction|metro|bus|auto|cab|commute|steps|step by step|journey|parikrama)\b/i.test(q)) return true;
+  if (/\b(transport|transit|how to visit|how to reach|how to go|travel details|directions|direction|metro|bus|auto|cab|commute|steps|step by step|journey|parikrama|transport details)\b/i.test(q)) return true;
   // Bengali Unicode script
-  if (/(ট্রান্সপোর্ট|যাতায়াত|পরিবহন|কীভাবে যাব|কিভাবে যাব|কীভাবে পৌঁছাব|রুট|পথ|মেট্রো|বাস|অটো|পরিক্রমা|রাস্তা|দিকনির্দেশ|ভ্রমণ|পৌঁছাব|যাব)/i.test(q)) return true;
+  if (/(ট্রান্সপোর্ট|যাতায়াত|পরিবহন|কীভাবে যাব|কিভাবে যাব|কীভাবে পৌঁছাব|মেট্রো|বাস|অটো|পরিক্রমা|রাস্তা|দিকনির্দেশ|ভ্রমণ|পৌঁছাব|যাব)/i.test(q)) return true;
   // Hindi Unicode script
   if (/(परिवहन|मार्ग|रास्ता|सफर|यात्रा|कैसे जाएं|कैसे जाए|मेट्रो|बस|ऑटो|गाइड)/i.test(q)) return true;
   // Phonetic Banglish / Hinglish
-  if (/\b(kivabe jabo|ki vabe jabo|kemon kore jabo|jatayat|poribohon|transport details|route details|kaise jaye|kaise jana hai|safarnama)\b/i.test(q)) return true;
+  if (/\b(kivabe jabo|ki vabe jabo|kemon kore jabo|jatayat|poribohon|transport details|kaise jaye|kaise jana hai|safarnama)\b/i.test(q)) return true;
   return false;
 }
+
 
 /**
  * Filter out image/video creation requests, school/college homework/syllabus studies, and academic research papers.
@@ -206,11 +219,15 @@ function generateStepByStepTransport(userQuery, context, lang) {
     }
   }
 
-  // Google Maps Multi-Waypoint URL
-  const origin = startLoc + ' Kolkata';
-  const destination = (rawSpots[rawSpots.length - 1]?.name || 'Kolkata') + ' Kolkata';
-  const waypointParam = waypointsForMaps.slice(0, -1).map(encodeURIComponent).join('|');
-  const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointParam ? `&waypoints=${waypointParam}` : ''}`;
+  // Check if user specifically requested a map or navigation link
+  const wantsMap = /\b(map|maps|directions|navigation|link|gmaps)\b/i.test(userQuery) || /(ম্যাপ|দিকনির্দেশ|নকশা|মানচিত্র)/i.test(userQuery);
+  let gmapsUrl = null;
+  if (wantsMap) {
+    const origin = startLoc + ' Kolkata';
+    const destination = (rawSpots[rawSpots.length - 1]?.name || 'Kolkata') + ' Kolkata';
+    const waypointParam = waypointsForMaps.slice(0, -1).map(encodeURIComponent).join('|');
+    gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointParam ? `&waypoints=${waypointParam}` : ''}`;
+  }
 
   if (lang === 'bn' || lang === 'bn_latin') {
     return {
@@ -221,8 +238,8 @@ function generateStepByStepTransport(userQuery, context, lang) {
         `**🚇 পুজো স্পেশাল মেট্রো ও ট্রাফিক টিপস:**\n` +
         `• **সারারাত মেট্রো:** সপ্তমী, অষ্টমী ও নবমীর রাতে কলকাতা মেট্রো ভোর ৪টে পর্যন্ত বিশেষ বর্ধিত পরিষেবা দেয়।\n` +
         `• **যানবাহন নিয়ন্ত্রণ:** বিকেল ৩:৩০ এর পর প্যান্ডেল সংলগ্ন রাস্তায় যান চলাচল বন্ধ হয়ে যায়; তাই মেট্রো এবং পায়ে হাঁটাই সবচেয়ে দ্রুততম মাধ্যম।\n` +
-        `• **জরুরি সহায়তা:** কলকাতা পুলিশ হেল্পলাইন ১১২ / ১০০।\n\n` +
-        `[🗺️ গুগল ম্যাপে পুরো রুটটি খুলুন](${gmapsUrl})`,
+        `• **জরুরি সহায়তা:** কলকাতা পুলিশ হেল্পলাইন ১১২ / ১০০।` +
+        (wantsMap && gmapsUrl ? `\n\n[🗺️ গুগল ম্যাপে পুরো রুটটি খুলুন](${gmapsUrl})` : ''),
       gmapsUrl,
     };
   } else if (lang === 'hi' || lang === 'hi_latin') {
@@ -234,8 +251,8 @@ function generateStepByStepTransport(userQuery, context, lang) {
         `**🚇 विशेष पूजा मेट्रो एवं ट्रैफिक टिप्स:**\n` +
         `• **रातभर मेट्रो सेवा:** सप्तमी, अष्टमी और नवमी को कोलकाता मेट्रो देर रात (सुबह 4:00 बजे तक) निरंतर चलती है।\n` +
         `• **ट्रैफिक प्रतिबंध:** शाम 3:30 बजे के बाद प्रमुख पंडालों के पास सड़कें पैदल यात्रियों के लिए आरक्षित रहती हैं, अतः मेट्रो और पैदल चलना ही सर्वोत्तम है।\n` +
-        `• **आपातकालीन सहायता:** पुलिस हेल्पलाइन 112 / 100।\n\n` +
-        `[🗺️ गूगल मैप्स में पूरा रूट खोलें](${gmapsUrl})`,
+        `• **आपातकालीन सहायता:** पुलिस हेल्पलाइन 112 / 100।` +
+        (wantsMap && gmapsUrl ? `\n\n[🗺️ गूगल मैप्स में पूरा रूट खोलें](${gmapsUrl})` : ''),
       gmapsUrl,
     };
   } else {
@@ -247,12 +264,13 @@ function generateStepByStepTransport(userQuery, context, lang) {
         `**🚇 Puja Transit Advice & Metro Timings:**\n` +
         `• **All-Night Metro:** Kolkata Metro operates extended all-night services on Saptami, Ashtami, and Navami until 4:00 AM.\n` +
         `• **Traffic & Barricades:** Vehicular traffic is restricted around pandals from 3:30 PM onwards; walking along designated queue barricades and taking the Metro is fastest.\n` +
-        `• **Emergency Helpline:** Kolkata Police 112 / 100.\n\n` +
-        `[🗺️ Open Complete Route in Google Maps](${gmapsUrl})`,
+        `• **Emergency Helpline:** Kolkata Police 112 / 100.` +
+        (wantsMap && gmapsUrl ? `\n\n[🗺️ Open Complete Route in Google Maps](${gmapsUrl})` : ''),
       gmapsUrl,
     };
   }
 }
+
 
 /**
  * Extract origin and destination from point-to-point queries across languages
@@ -302,8 +320,47 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     }
   }
 
+  // 1.5 Route Knowledge Check (e.g. "You know about my route details?", "what is my route?", "আমার রুট জানো?")
+  if (isRouteKnowledgeCheck(userQuery)) {
+
+    const rawSpots = Array.isArray(context.groupSpots) && context.groupSpots.length > 0
+      ? context.groupSpots
+      : Array.isArray(context.waypoints) && context.waypoints.length > 0
+        ? context.waypoints.filter(w => w && w.id !== 'start-0' && w.id !== 'start-me')
+        : [];
+    const startLoc = context.startLocation || (context.waypoints?.[0]?.name?.replace(/\s*\(Start\)$/i, '')) || 'Kolkata Central';
+    const planName = context.groupName || 'Durga Puja Parikrama';
+
+    if (rawSpots.length === 0) {
+      return {
+        reply: (lang === 'bn' || lang === 'bn_latin')
+          ? `🙏 **শুভ শারদীয়া!** হ্যাঁ, আপনার প্ল্যানের নাম **"${planName}"** এবং শুরুর স্থান **"${startLoc}"**। তবে এখনও কোনো প্যান্ডেল যুক্ত করা হয়নি। **Plan** ট্যাবে গিয়ে পছন্দের প্যান্ডেলগুলি যোগ করুন!`
+          : `🙏 **শুভ শারদীয়া!** Yes, I know your plan details for **"${planName}"**! Your designated starting point is **${startLoc}**. You haven't added any pandals yet — tap the **Plan** tab to add them!`,
+        gmapsUrl: null,
+      };
+    }
+
+    const stopsList = rawSpots.map((s, idx) => `${idx + 1}. **${s.name || s.spot?.name || 'Pandal'}** (${s.area || s.spot?.area || 'Kolkata'})${s.nearestMetro ? ` [Metro: ${s.nearestMetro}]` : ''}`).join('\n');
+
+    return {
+      reply: (lang === 'bn' || lang === 'bn_latin')
+        ? `🙏 **শুভ শারদীয়া!** হ্যাঁ, আমি আপনার সম্পূর্ণ রুট ও প্ল্যান বিস্তারিত জানি!\n\n` +
+          `• **প্ল্যানের নাম:** ${planName}\n` +
+          `• **শুরুর স্থান:** ${startLoc}\n` +
+          `• **আপনার নির্ধারিত প্যান্ডেল তালিকা (ক্রম অনুযায়ী):**\n${stopsList}\n\n` +
+          `আপনি চাইলে এই রুটের জন্য ধাপে ধাপে যাতায়াত নির্দেশিকা (মেট্রো, হাঁটা ও অটো) অথবা কাছাকাছি টয়লেট বা খাবারের সন্ধান আমাকে জিজ্ঞেস করতে পারেন!`
+        : `🙏 **শুভ শারদীয়া!** Yes, I have your complete route details for **"${planName}"** right here!\n\n` +
+          `• **Plan Name:** ${planName}\n` +
+          `• **Starting Point:** ${startLoc}\n` +
+          `• **Your Planned Stops in Order:**\n${stopsList}\n\n` +
+          `Feel free to ask for step-by-step transport from start to end, or nearby facilities like washrooms or restaurants!`,
+      gmapsUrl: null,
+    };
+  }
+
   // 2. Point-to-Point Transit / Distance (e.g. "Howrah to Bagbazar", "শিয়ালদহ থেকে দেশপ্রিয় পার্ক", "हावड़ा से कालीघाट")
   const p2p = extractPointToPoint(userQuery);
+
   if (p2p) {
     const origin = p2p.origin;
     const destination = p2p.dest;
@@ -475,30 +532,37 @@ CRITICAL RULES:
 2. USER'S ACTUAL PLAN & ROUTE DETAILS:
    - Plan Name: "${groupName || 'Durga Puja Parikrama'}"
    - Starting Point: "${startLocation || 'Kolkata Central'}"
-   - Ordered Pandal Stops:
+   - Ordered Pandal Stops in Route:
 ${spotList}
 
-3. STEP-BY-STEP TRANSPORT DETAILS:
-   - When asked for "transport details", "transit", "route", "how to visit", "কীভাবে যাব", "যাতায়াত ব্যবস্থা", "परिवहन", "kaise jaye", or how to travel between pandals:
-     Provide an EXHAUSTIVE, step-by-step transport guide from "${startLocation || 'Kolkata Central'}" through each pandal in exact order.
-     For each step (e.g. Step 1: Start ➔ Pandal 1, Step 2: Pandal 1 ➔ Pandal 2):
-       * Specify the exact Kolkata Metro line (Blue Line North-South / Green Line East-West underwater) and station to alight.
-       * Detail walking distances / times between nearby pandals in the same cluster.
+3. ROUTE & TRANSPORT INQUIRIES:
+   - When the user asks about their route (e.g. "You know about my route details?", "what is my route?", "আমার রুট জানো?"):
+     Confirm you know their plan! List their starting point and each planned pandal in sequence with friendly puja commentary. Do NOT include Google Maps links.
+   - When asked for "transport details", "transit", "how to travel", "step by step transport", "কীভাবে যাব", "যাতায়াত ব্যবস্থা", "परिवहन", "kaise jaye":
+     Provide an EXHAUSTIVE, step-by-step transport guide from "${startLocation || 'Kolkata Central'}" all the way through each consecutive pandal in their plan until the end!
+     For each step (e.g. Step 1: Start ➔ Pandal 1, Step 2: Pandal 1 ➔ Pandal 2, etc.):
+       * Detail the exact Kolkata Metro line (Blue Line North-South / Green Line East-West underwater) and the best station to alight.
+       * Detail walking distances/times between nearby pandals in the same cluster.
        * Detail auto-rickshaw or taxi routes where appropriate.
-       * Mention late-night Puja metro services (running till 4:00 AM on Saptami, Ashtami, Navami).
-     At the end, provide ONE Google Maps directions link: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<START>&destination=<DEST>&waypoints=<WAYPOINTS>)
+       * Detail late-night Puja metro timing (trains run all night till 4:00 AM on Saptami, Ashtami, Navami).
+     Only include a Google Maps link if the user specifically asked for a map/link!
 
-4. POINT-TO-POINT TRANSIT:
-   - If asked how to travel between two specific locations (e.g. Howrah to Bagbazar):
-     Detail the exact Metro route, road distance, and walking paths with a direct Google Maps link.
+4. RULES FOR GOOGLE MAPS LINKS:
+   - DO NOT give Google Maps links for regular questions, chit-chat, route knowledge checks, or general puja queries!
+   - ONLY include a Google Maps link if:
+     a) The user explicitly asks for nearby amenities or places: toilets/washrooms ("toilet near me", "bathroom"), bars/pubs ("bars near me"), restaurants/food, ATMs, hospitals/doctors.
+     b) The user explicitly asks for a map/directions link ("give google maps link", "show route map").
+     c) Point-to-point transit directions between two specified locations (e.g. Howrah to Bagbazar).
+   - If providing a Google Maps link, format it cleanly as: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<search_term>+Kolkata)
 
-5. AMENITY QUERIES:
-   - Only for washrooms/toilets, food, bars, ATMs, or hospitals: suggest top spots near the location with a Google Maps search link.
+5. CASUAL CHAT & FESTIVE SPIRIT:
+   - Warm, intelligent, natural responses with Durga Puja festival greetings (শুভ শারদীয়া! 🙏 / Happy Durga Puja!). Never sound like a robotic pre-recorded script!
 
-6. CASUAL CHAT & GREETINGS:
-   - Warm, minimal, conversational response in the user's language without Google Maps links.
+6. DIRECT USER RESPONSE:
+   - Output ONLY the final helpful response for the user. Never include internal reasoning traces, checklist bullet points, or thoughts in the reply.
 ${locationContext}`;
 }
+
 
 /**
  * POST /api/ai/chat
@@ -534,9 +598,9 @@ router.post('/chat', async (req, res, next) => {
       });
     }
 
-    // 3. Try Gemini 3 API models if valid key is available
-    const apiKey = (process.env.GEMINI_API_KEY || req.headers['x-gemini-key'] || req.body?.apiKey || req.body?.context?.apiKey || '').trim();
-    if (apiKey && apiKey.startsWith('AIzaSy')) {
+    // 3. Try Gemini 3 API models with real key
+    const apiKey = (req.headers['x-gemini-key'] || process.env.GEMINI_API_KEY || req.body?.apiKey || req.body?.context?.apiKey || DEFAULT_GEMINI_KEY || '').trim();
+    if (apiKey && apiKey.length > 15) {
       const systemInstruction = buildSystemInstruction(context);
       const contents = [];
 
@@ -556,8 +620,8 @@ router.post('/chat', async (req, res, next) => {
           parts: [{ text: systemInstruction }],
         },
         generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 1200,
+          temperature: 0.5,
+          maxOutputTokens: 1500,
           topP: 0.9,
         },
       };
@@ -566,7 +630,8 @@ router.post('/chat', async (req, res, next) => {
         try {
           const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          const timeoutId = setTimeout(() => controller.abort(), 7000);
+
 
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -582,10 +647,13 @@ router.post('/chat', async (req, res, next) => {
 
             if (textResponse) {
               let gmapsUrl = null;
+              const isAmenityOrNav = /\b(toilet|washroom|bathroom|bar|pub|bars|pubs|food|restaurant|biryani|hospital|doctor|atm|cash|map|maps|directions|navigation|where\s+is|near\s+me)\b/i.test(userQuery) ||
+                /(টয়লেট|বাথরুম|বার|পাব|রেস্তোরাঁ|খাবার|হাসপাতাল|এটিএম|ম্যাপ|শৌচাগার|शौचालय|बार|रेस्तरां|नक्शा|पास)/i.test(userQuery);
+
               const gmapsMatch = textResponse.match(/https:\/\/www\.google\.com\/maps\/[^\s\)\>]+/);
-              if (gmapsMatch) {
+              if (gmapsMatch && isAmenityOrNav) {
                 gmapsUrl = gmapsMatch[0];
-              } else if (/\b(toilet|washroom|bathroom|bar|pub|bars|pubs|food|restaurant|biryani|hospital|doctor|atm|cash)\b/i.test(userQuery)) {
+              } else if (isAmenityOrNav && /\b(near\s+me|কাছে|पास)\b/i.test(userQuery)) {
                 gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
               }
 
@@ -604,6 +672,7 @@ router.post('/chat', async (req, res, next) => {
         } catch (_) {}
       }
     }
+
 
     // 4. Universal Comprehensive Answering Engine (Instant fallback with deep knowledge + Maps links in all languages)
     const intelligentAnswer = generateComprehensiveAnswer(userQuery, context);

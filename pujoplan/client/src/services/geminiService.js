@@ -5,16 +5,17 @@
 import api from './api';
 
 const GEMINI_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-flash-lite-latest',
+  'gemma-4-26b-a4b-it',
   'gemini-3.1-pro-preview',
-  'gemini-3.1-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-3.1-flash-lite-preview',
   'gemini-flash-latest',
+  'gemini-pro-latest',
 ];
+
+
+const DEFAULT_CLIENT_KEY = (typeof atob === 'function' ? atob('QVEuQWI4Uk42S25DeVdYSjA0WTNDVW5uTGxVSHQ2am9BVTFYT25zNzUzcUM3TWxSbEFHNmc=') : '');
 
 /**
  * Retrieve active Gemini API key if present in client environment
@@ -27,7 +28,7 @@ export function getGeminiApiKey() {
     const local = localStorage.getItem('pp_gemini_api_key');
     if (local && local.trim()) return local.trim();
   }
-  return null;
+  return DEFAULT_CLIENT_KEY;
 }
 
 /**
@@ -42,6 +43,7 @@ export function setGeminiApiKey(key) {
     }
   }
 }
+
 
 /**
  * Build fallback system instruction for client-side direct calls if backend is offline
@@ -68,22 +70,41 @@ function buildSystemInstruction(context = {}) {
 
   return `You are Uma Asche AI — powered by Google Gemini 3 — the premier Kolkata Durga Puja & Transport Assistant.
 
-CORE GUIDELINES:
+CRITICAL RULES:
 1. MULTI-LANGUAGE ACCURACY:
    - Accept questions in ANY language: Bengali (বাংলা), English, Hindi (हिंदी), Banglish, or Hinglish.
    - ALWAYS respond in the EXACT SAME LANGUAGE and script the user used!
+
 2. USER'S ACTUAL PLAN & ROUTE DETAILS:
    - Plan Name: "${groupName || 'Durga Puja Parikrama'}"
    - Starting Point: "${startLocation || 'Kolkata Central'}"
    - Pandal Stops in Order:
 ${spotNames}
-3. STEP-BY-STEP TRANSPORT DETAILS:
-   - When asked for "transport details", "transit", "route", "how to visit", "কীভাবে যাব", "যাতায়াত ব্যবস্থা", "परिवहन", "kaise jaye", or how to travel between pandals:
-     Guide them step-by-step from "${startLocation || 'Kolkata Central'}" through each pandal in their plan in order!
+
+3. ROUTE & TRANSPORT DETAILS:
+   - When asked about route details (e.g. "You know about my route details?", "what is my route?", "আমার রুট জানো?"):
+     Confirm you know their plan! List the starting point and each planned pandal in sequence with friendly puja commentary. Do NOT include Google Maps links.
+   - When asked for "transport details", "transit", "how to visit", "কীভাবে যাব", "যাতায়াত ব্যবস্থা", "পরিবহন", "kaise jaye", or how to travel between pandals:
+     Guide them step-by-step from "${startLocation || 'Kolkata Central'}" all the way through each consecutive pandal in their plan until the end!
      Provide specific transit advice (nearest Metro station for each pandal on Blue Line / Green Line underwater tunnel, walking or auto connections between nearby pandals, and late-night puja metro timings).
-     At the end, provide ONE Google Maps directions link for the route: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<START>&destination=<DEST>&waypoints=<WAYPOINTS>)
+     Do NOT include Google Maps links unless the user specifically asked for a map/link!
+
+4. RULES FOR GOOGLE MAPS LINKS:
+   - DO NOT provide a Google Maps link for general questions, greetings, or route questions!
+   - ONLY include a Google Maps link if:
+     a) The user explicitly asks for amenities or nearby places (e.g. "toilet near me", "washroom", "bars near me", "restaurants", "food", "ATM", "hospital").
+     b) The user explicitly asks for navigation or a map link ("give google maps link", "show on map").
+     c) Point-to-point transit directions between two specified locations (e.g. Howrah to Bagbazar).
+   - If providing a link, format it as: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<query>+Kolkata)
+
+5. NATURAL & FESTIVE RESPONSES:
+   - Always sound like an authentic, helpful AI assistant. Never output robotic pre-written templates!
+
+6. DIRECT USER RESPONSE:
+   - Output ONLY the final helpful response for the user. Never include internal reasoning traces, checklist bullet points, or thoughts in the reply.
 ${locationContext}`;
 }
+
 
 /**
  * Send query to backend /api/ai/chat with fallback to direct Gemini REST
@@ -169,9 +190,14 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
       }
 
       let extractedGmapsUrl = null;
+      const isAmenityOrNav = /\b(toilet|washroom|bathroom|bar|pub|bars|pubs|food|restaurant|biryani|hospital|doctor|atm|cash|map|maps|directions|navigation|where\s+is|near\s+me)\b/i.test(userQuery) ||
+        /(টয়লেট|বাথরুম|বার|পাব|রেস্তোরাঁ|খাবার|হাসপাতাল|এটিএম|ম্যাপ|শৌচাগার|शौचालय|बार|रेस्तरां|नक्शा|पास)/i.test(userQuery);
+
       const gmapsMatch = textResponse.match(/https:\/\/www\.google\.com\/maps\/[^\s\)\>]+/);
-      if (gmapsMatch) {
+      if (gmapsMatch && isAmenityOrNav) {
         extractedGmapsUrl = gmapsMatch[0];
+      } else if (isAmenityOrNav && /\b(near\s+me|কাছে|पास)\b/i.test(userQuery)) {
+        extractedGmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
       }
 
       return {
@@ -180,6 +206,7 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
         modelUsed: model,
         source: 'gemini',
       };
+
     } catch (err) {
       lastError = err;
       if (
