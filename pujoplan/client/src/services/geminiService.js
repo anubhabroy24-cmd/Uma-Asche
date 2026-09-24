@@ -5,6 +5,11 @@
 import api from './api';
 
 const GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
   'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-1.5-flash',
@@ -42,10 +47,16 @@ export function setGeminiApiKey(key) {
  * Build fallback system instruction for client-side direct calls if backend is offline
  */
 function buildSystemInstruction(context = {}) {
-  const { groupName, startLocation, groupSpots = [], userLocation } = context;
+  const { groupName, startLocation, groupSpots = [], waypoints = [], userLocation } = context;
 
-  const spotNames = Array.isArray(groupSpots) && groupSpots.length > 0
+  const allStops = (groupSpots && groupSpots.length > 0)
     ? groupSpots
+    : (waypoints && waypoints.length > 0)
+      ? waypoints.filter(w => w && w.id !== 'start-0' && w.id !== 'start-me')
+      : [];
+
+  const spotNames = allStops.length > 0
+    ? allStops
         .map((s, i) => `${i + 1}. ${s.name || s.spot?.name || 'Pandal'}${s.area ? ` (${s.area})` : ''}${s.nearestMetro ? ` [Nearest Metro: ${s.nearestMetro}]` : ''}`)
         .join('\n')
     : 'None added yet.';
@@ -55,30 +66,22 @@ function buildSystemInstruction(context = {}) {
     locationContext = `\nUser's current GPS location: Lat ${Number(userLocation.latitude).toFixed(4)}, Lng ${Number(userLocation.longitude).toFixed(4)} (Kolkata).`;
   }
 
-  return `You are Uma Asche AI — the intelligent, friendly, and comprehensive Kolkata Durga Puja & General Assistant.
+  return `You are Uma Asche AI — powered by Google Gemini 3 — the premier Kolkata Durga Puja & Transport Assistant.
 
 CORE GUIDELINES:
-1. USER'S ACTUAL PLAN & ROUTE DETAILS:
+1. MULTI-LANGUAGE ACCURACY:
+   - Accept questions in ANY language: Bengali (বাংলা), English, Hindi (हिंदी), Banglish, or Hinglish.
+   - ALWAYS respond in the EXACT SAME LANGUAGE and script the user used!
+2. USER'S ACTUAL PLAN & ROUTE DETAILS:
    - Plan Name: "${groupName || 'Durga Puja Parikrama'}"
    - Starting Point: "${startLocation || 'Kolkata Central'}"
    - Pandal Stops in Order:
 ${spotNames}
-   - When the user asks for "transport details", "route", "itinerary", or how to visit their route:
-     Guide them step-by-step from their starting point "${startLocation || 'Kolkata Central'}" through each pandal in their plan in order!
-     Provide specific transit advice (nearest Metro station for each pandal, walking or auto connections between nearby pandals, and late-night puja metro timings).
-     At the very end of your response, provide ONE Google Maps directions link for the route: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<START>&destination=<DEST>&waypoints=<WAYPOINTS>)
-
-2. CASUAL CONVERSATION & GREETINGS (NO GOOGLE MAPS):
-   - When the user says "hello", "hi", "hey", "ki korcho", "kemon acho", or asks casual conversational questions:
-     Reply minimally, warmly, and naturally in their language (Bengali, English, Hindi, etc.).
-     DO NOT include ANY Google Maps link for greetings or casual conversation.
-
-3. AMENITY SEARCHES (PROVIDE GOOGLE MAPS):
-   - ONLY when the user explicitly asks for amenities or locations (e.g. "bars near me", "toilet near me", "restaurants/biryani near me", "atms near me", "hospitals near me"):
-     Recommend top local Kolkata places and provide ONE Google Maps search link at the end: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata).
-
-4. GENERAL CONVERSATION:
-   - For general questions not asking for a place or directions, give a clear, direct answer WITHOUT any Google Maps links.
+3. STEP-BY-STEP TRANSPORT DETAILS:
+   - When asked for "transport details", "transit", "route", "how to visit", "কীভাবে যাব", "যাতায়াত ব্যবস্থা", "परिवहन", "kaise jaye", or how to travel between pandals:
+     Guide them step-by-step from "${startLocation || 'Kolkata Central'}" through each pandal in their plan in order!
+     Provide specific transit advice (nearest Metro station for each pandal on Blue Line / Green Line underwater tunnel, walking or auto connections between nearby pandals, and late-night puja metro timings).
+     At the end, provide ONE Google Maps directions link for the route: [🗺️ Open Route in Google Maps](https://www.google.com/maps/dir/?api=1&origin=<START>&destination=<DEST>&waypoints=<WAYPOINTS>)
 ${locationContext}`;
 }
 
@@ -87,18 +90,21 @@ ${locationContext}`;
  */
 export async function sendGeminiMessage(userQuery, conversationHistory = [], context = {}) {
   // 1. First priority: Connect with backend and pass questions through it
+  const clientKey = getGeminiApiKey();
   try {
     const res = await api.post('/ai/chat', {
       message: userQuery,
       conversationHistory,
       context,
+    }, {
+      headers: clientKey ? { 'x-gemini-key': clientKey } : {}
     });
 
     if (res.data && res.data.reply) {
       return {
         reply: res.data.reply,
         gmapsUrl: res.data.gmapsUrl,
-        modelUsed: res.data.modelUsed || 'gemini-3.6-flash',
+        modelUsed: res.data.modelUsed || 'gemini-3.5-flash',
         source: 'gemini',
       };
     }

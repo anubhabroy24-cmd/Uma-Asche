@@ -220,6 +220,7 @@ export default function DistanceChatbot({
         groupName,
         startLocation,
         groupSpots,
+        waypoints,
         userLocation: activeLoc,
       });
 
