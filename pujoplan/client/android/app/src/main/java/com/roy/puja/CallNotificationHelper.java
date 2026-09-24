@@ -125,7 +125,41 @@ public class CallNotificationHelper {
                 .addAction(android.R.drawable.ic_menu_call, "ANSWER", answerPendingIntent)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "DECLINE", declinePendingIntent);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                androidx.core.app.Person callerPerson = new androidx.core.app.Person.Builder()
+                        .setName(callerName)
+                        .setImportant(true)
+                        .build();
+
+                NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                        callerPerson,
+                        declinePendingIntent,
+                        answerPendingIntent
+                );
+                builder.setStyle(callStyle);
+            } catch (Exception ignored) {}
+        }
+
         manager.notify(CALL_NOTIFICATION_ID, builder.build());
+
+        // Attempt direct full screen popup over lockscreen or other apps
+        try {
+            Intent popIntent = new Intent(context, MainActivity.class);
+            popIntent.setAction("com.roy.puja.INCOMING_CALL");
+            popIntent.putExtra("call_action", "incoming");
+            popIntent.putExtra("groupId", groupId);
+            popIntent.putExtra("groupName", groupName);
+            popIntent.putExtra("callerName", callerName);
+            popIntent.putExtra("callMode", callMode);
+            popIntent.putExtra("callId", callId);
+            popIntent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK |
+                Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            );
+            context.startActivity(popIntent);
+        } catch (Exception ignored) {}
     }
 
     public static synchronized void dismissCall(Context context) {

@@ -406,33 +406,45 @@ export default function GroupDashboard() {
     }
   }, [activeTab]);
 
-  const requestGpsLocation = useCallback(() => {
-    if (!navigator?.geolocation) return;
+  const requestGpsLocation = useCallback((shouldFlyTo = false) => {
+    // 1. Request native Android location permission and prompt enable GPS if needed
+    if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.requestLocationPermission) {
+      window.AndroidBridge.requestLocationPermission();
+    }
+
+    if (!navigator?.geolocation) {
+      setToastMessage('GPS Geolocation is not supported on this device.');
+      return;
+    }
 
     const onPos = (pos) => {
-      setMyLocation({
+      const loc = {
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy || 30,
-      });
+        accuracy: pos.coords.accuracy || 20,
+      };
+      setMyLocation(loc);
+      if (shouldFlyTo && mapComponentRef.current) {
+        mapComponentRef.current.recenterMe();
+      }
     };
 
     navigator.geolocation.getCurrentPosition(
       onPos,
-      () => {
-        navigator.geolocation.getCurrentPosition(onPos, () => { }, {
-          enableHighAccuracy: false,
-          timeout: 12000,
-          maximumAge: 60000,
-        });
+      (err) => {
+        console.warn('[GPS] Position failed:', err);
+        if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.promptEnableGps) {
+          window.AndroidBridge.promptEnableGps();
+        }
+        setToastMessage('⚠️ Location is off. Please enable GPS Location to see your live position.');
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, []);
 
   // Auto-read GPS when mounted or when Route tab opens
   useEffect(() => {
-    requestGpsLocation();
+    requestGpsLocation(false);
   }, [requestGpsLocation, activeTab]);
 
   // Passive watchPosition while Route tab is open — keeps the blue dot and red tracker live
@@ -1407,6 +1419,7 @@ export default function GroupDashboard() {
                 onToggleSharing={handleToggleSharing}
                 sharingLoading={sharingLoading}
                 onRecenterOnMe={() => {
+                  requestGpsLocation(true);
                   mapComponentRef.current?.recenterMe();
                 }}
                 onFitRoute={() => {

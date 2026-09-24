@@ -333,6 +333,8 @@ async function handleCallSignal(req, res, next) {
 async function checkActiveCallsForUser(req, res) {
   try {
     let userId = req.query.userId || req.user?.id || req.user?.uid;
+    let userEmail = req.query.email ? String(req.query.email).trim().toLowerCase() : (req.user?.email ? String(req.user.email).trim().toLowerCase() : null);
+
     // If not in query or req.user, check Authorization header if present
     if (!userId && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
       try {
@@ -340,11 +342,14 @@ async function checkActiveCallsForUser(req, res) {
         const jwtPayload = jwt.decode(token);
         if (jwtPayload) {
           userId = jwtPayload.uid || jwtPayload.id || jwtPayload.sub;
+          if (!userEmail && jwtPayload.email) {
+            userEmail = String(jwtPayload.email).trim().toLowerCase();
+          }
         }
       } catch (_) {}
     }
 
-    if (!userId) {
+    if (!userId && !userEmail) {
       return res.json({ hasCall: false, reason: 'missing_user_id' });
     }
 
@@ -365,23 +370,30 @@ async function checkActiveCallsForUser(req, res) {
 
       // If caller is the user themselves, skip
       const callerId = call.caller?.id || call.caller?.userId;
-      if (callerId === userId) {
+      const callerEmail = call.caller?.email ? String(call.caller.email).toLowerCase().trim() : null;
+      if ((userId && callerId === userId) || (userEmail && callerEmail && userEmail === callerEmail)) {
         continue;
       }
 
       // Check if user is already participating in this call
-      if (Array.isArray(call.candidates) && call.candidates.some(c => (c.id || c.userId) === userId)) {
+      if (Array.isArray(call.candidates) && call.candidates.some(c => (c.id || c.userId) === userId || (userEmail && c.email && c.email.toLowerCase() === userEmail))) {
         continue;
       }
 
       // Check if user belongs to call.groupId
-      const grp = await Group.findOne({ id: call.groupId }).select('id name adminId memberUids members').lean();
+      const grp = await Group.findOne({ id: call.groupId }).select('id name adminId admin memberUids members').lean();
       if (!grp) continue;
 
+      const adminEmail = grp.admin?.email ? String(grp.admin.email).toLowerCase().trim() : null;
       const isMember =
-        grp.adminId === userId ||
-        (Array.isArray(grp.memberUids) && grp.memberUids.includes(userId)) ||
-        (Array.isArray(grp.members) && grp.members.some(m => m.userId === userId || m.id === userId || m.user?.id === userId));
+        (userId && grp.adminId === userId) ||
+        (userEmail && adminEmail === userEmail) ||
+        (userId && Array.isArray(grp.memberUids) && grp.memberUids.includes(userId)) ||
+        (Array.isArray(grp.members) && grp.members.some(m => {
+          const mId = m.userId || m.id || m.user?.id;
+          const mEmail = m.user?.email ? String(m.user.email).toLowerCase().trim() : null;
+          return (userId && mId === userId) || (userEmail && mEmail === userEmail);
+        }));
 
       if (isMember) {
         return res.json({
