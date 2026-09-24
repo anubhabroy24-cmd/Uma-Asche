@@ -565,38 +565,24 @@ const PujaMap = forwardRef(function PujaMap({
 
   // Recenter on My Location
   const handleRecenterMe = () => {
-    // 1. Ask native Android for GPS Location Permission / Prompt
-    if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.requestLocationPermission) {
-      window.AndroidBridge.requestLocationPermission();
-    }
-
     if (effectiveLocation?.latitude && effectiveLocation?.longitude && mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([effectiveLocation.latitude, effectiveLocation.longitude], 16, { duration: 0.8 });
     } else if (navigator?.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy || 20 };
+          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy || 30 };
           setInternalLoc(loc);
           mapInstanceRef.current?.flyTo([loc.latitude, loc.longitude], 16, { duration: 0.8 });
         },
-        (err) => {
-          console.warn('[PujaMap] Geolocation failed:', err);
-          if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.promptEnableGps) {
-            window.AndroidBridge.promptEnableGps();
-          }
-          if (onError) {
-            onError('⚠️ Location is off. Please allow location permissions and turn on GPS.');
+        () => {
+          if (waypoints.length > 0 && mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([waypoints[0].lat, waypoints[0].lng], 15, { duration: 0.8 });
           }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 8000 }
       );
-    } else {
-      if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.promptEnableGps) {
-        window.AndroidBridge.promptEnableGps();
-      }
-      if (onError) {
-        onError('⚠️ Location is off. Please enable GPS on your device.');
-      }
+    } else if (waypoints.length > 0 && mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([waypoints[0].lat, waypoints[0].lng], 15, { duration: 0.8 });
     }
   };
 

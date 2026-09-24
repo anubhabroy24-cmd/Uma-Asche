@@ -125,22 +125,6 @@ public class CallNotificationHelper {
                 .addAction(android.R.drawable.ic_menu_call, "ANSWER", answerPendingIntent)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "DECLINE", declinePendingIntent);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                androidx.core.app.Person callerPerson = new androidx.core.app.Person.Builder()
-                        .setName(callerName)
-                        .setImportant(true)
-                        .build();
-
-                NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
-                        callerPerson,
-                        declinePendingIntent,
-                        answerPendingIntent
-                );
-                builder.setStyle(callStyle);
-            } catch (Exception ignored) {}
-        }
-
         manager.notify(CALL_NOTIFICATION_ID, builder.build());
     }
 

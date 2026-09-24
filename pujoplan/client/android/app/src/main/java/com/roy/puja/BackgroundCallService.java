@@ -118,10 +118,8 @@ public class BackgroundCallService extends Service {
 
             String apiUrl = prefs.getString("api_url", "https://uma-asche.onrender.com/api");
             String token = prefs.getString("token", "");
-            String email = prefs.getString("email", "");
 
-            String endpoint = apiUrl + "/calls/check-active?userId=" + URLEncoder.encode(userId, "UTF-8")
-                    + (email != null && !email.trim().isEmpty() ? "&email=" + URLEncoder.encode(email.trim(), "UTF-8") : "");
+            String endpoint = apiUrl + "/calls/check-active?userId=" + URLEncoder.encode(userId, "UTF-8");
             URL url = new URL(endpoint);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");

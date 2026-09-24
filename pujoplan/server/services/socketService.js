@@ -127,40 +127,20 @@ function initSocket(server, clientUrl) {
     const email = (user.email || '').toLowerCase().trim();
     console.log(`[Socket] ⚡ User connected: ${user.name || uid} (${socket.id})`);
 
-function isGenericEmail(email) {
-  if (!email || typeof email !== 'string') return true;
-  const e = email.toLowerCase().trim();
-  return (
-    !e ||
-    e === 'user@pujoplan.app' ||
-    e === 'demo@pujoplan.dev' ||
-    e === 'anonymous' ||
-    e.endsWith('@pujoplan.app') ||
-    e.endsWith('@pujoplan.dev') ||
-    !e.includes('@')
-  );
-}
-
-function isInvalidUid(uid) {
-  if (!uid || typeof uid !== 'string') return true;
-  const u = uid.trim().toLowerCase();
-  return !u || u === 'local-user' || u === 'anonymous' || u === 'undefined' || u === 'null' || u.startsWith('guest_');
-}
-
     // Personal user rooms for targeted direct calls and notifications
-    if (uid && !isInvalidUid(uid)) {
+    if (uid) {
       socket.join(`user:${uid}`);
       socket.join(uid);
     }
-    if (user.id && user.id !== uid && !isInvalidUid(user.id)) {
+    if (user.id && user.id !== uid) {
       socket.join(`user:${user.id}`);
       socket.join(user.id);
     }
-    if (user._id && String(user._id) !== uid && String(user._id) !== user.id && !isInvalidUid(String(user._id))) {
+    if (user._id && String(user._id) !== uid && String(user._id) !== user.id) {
       socket.join(`user:${String(user._id)}`);
       socket.join(String(user._id));
     }
-    if (email && !isGenericEmail(email)) {
+    if (email) {
       socket.join(`user:email:${email}`);
       socket.join(`user:${email}`);
       socket.join(email);
@@ -169,30 +149,24 @@ function isInvalidUid(uid) {
     // Function to join all groups for a user
     const autoJoinUserGroups = async (targetUser) => {
       const u = targetUser || user;
-      const uids = [u.uid, u.id, u._id ? String(u._id) : null].filter(Boolean).filter(k => !isInvalidUid(k));
+      const uids = [u.uid, u.id, u._id ? String(u._id) : null].filter(Boolean);
       const userEmail = (u.email || '').toLowerCase().trim();
-      const hasValidEmail = !isGenericEmail(userEmail);
 
-      if (uids.length === 0 && !hasValidEmail) return;
-
-      const orConditions = [];
-      if (uids.length > 0) {
-        orConditions.push(
-          { memberUids: { $in: uids } },
-          { adminId: { $in: uids } },
-          { 'admin.id': { $in: uids } },
-          { 'members.userId': { $in: uids } },
-          { 'members.user.id': { $in: uids } }
-        );
-      }
-      if (hasValidEmail) {
+      const orConditions = [
+        { memberUids: { $in: uids } },
+        { adminId: { $in: uids } },
+        { 'admin.id': { $in: uids } },
+        { 'members.userId': { $in: uids } },
+        { 'members.user.id': { $in: uids } },
+      ];
+      if (userEmail) {
         orConditions.push(
           { 'admin.email': { $regex: new RegExp(`^${userEmail}$`, 'i') } },
           { 'members.user.email': { $regex: new RegExp(`^${userEmail}$`, 'i') } }
         );
       }
 
-      if (orConditions.length > 0) {
+      if (uids.length > 0 && !uids.every(u => String(u).startsWith('guest_') || u === 'anonymous')) {
         try {
           const groups = await Group.find({ $or: orConditions });
           if (Array.isArray(groups)) {
@@ -215,13 +189,13 @@ function isInvalidUid(uid) {
       if (!userData) return;
       const regUid = userData.uid || userData.id || userData._id;
       const regEmail = (userData.email || '').toLowerCase().trim();
-      if (regUid && !isInvalidUid(regUid)) {
+      if (regUid) {
         socket.join(`user:${regUid}`);
         socket.join(regUid);
-        if (userData.id && !isInvalidUid(userData.id)) socket.join(`user:${userData.id}`);
-        if (userData._id && !isInvalidUid(String(userData._id))) socket.join(`user:${String(userData._id)}`);
+        if (userData.id) socket.join(`user:${userData.id}`);
+        if (userData._id) socket.join(`user:${String(userData._id)}`);
       }
-      if (regEmail && !isGenericEmail(regEmail)) {
+      if (regEmail) {
         socket.join(`user:email:${regEmail}`);
         socket.join(`user:${regEmail}`);
         socket.join(regEmail);

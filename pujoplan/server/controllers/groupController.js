@@ -24,37 +24,17 @@ function decodeInviteToken(token) {
   }
 }
 
-function isGenericEmail(email) {
-  if (!email || typeof email !== 'string') return true;
-  const e = email.toLowerCase().trim();
-  return (
-    !e ||
-    e === 'user@pujoplan.app' ||
-    e === 'demo@pujoplan.dev' ||
-    e === 'anonymous' ||
-    e.endsWith('@pujoplan.app') ||
-    e.endsWith('@pujoplan.dev') ||
-    !e.includes('@')
-  );
-}
-
-function isInvalidUid(uid) {
-  if (!uid || typeof uid !== 'string') return true;
-  const u = uid.trim().toLowerCase();
-  return !u || u === 'local-user' || u === 'anonymous' || u === 'undefined' || u === 'null' || u.startsWith('guest_');
-}
-
 function getUserIdentityKeys(user = {}) {
   const raw = [
     user.id,
     user.uid,
-    user._id ? String(user._id) : null,
+    user._id,
     user.firebaseUid,
+    user.email,
   ].filter(Boolean);
 
-  return raw
-    .map((value) => String(value).trim())
-    .filter((v) => !isInvalidUid(v));
+  const ids = raw.filter((value) => typeof value === 'string' && value.trim() !== '');
+  return ids.map((value) => String(value).trim());
 }
 
 function userMatchesMember(user, member) {
@@ -67,38 +47,16 @@ function userMatchesMember(user, member) {
     member.user?.uid,
     member.user?.firebaseUid,
     member.id,
-  ].filter(Boolean).map((value) => String(value).trim()).filter(k => !isInvalidUid(k));
+    member.user?.email,
+    member.email,
+  ].filter(Boolean).map((value) => String(value).trim());
+
+  const userEmails = userKeys.filter((value) => value.includes('@'));
+  const memberEmails = memberKeys.filter((value) => value.includes('@'));
 
   const sharedId = userKeys.some((key) => memberKeys.includes(key));
-  if (sharedId) return true;
-
-  const uEmail = (user.email || '').toLowerCase().trim();
-  const mEmail = (member.user?.email || member.email || '').toLowerCase().trim();
-  if (uEmail && mEmail && !isGenericEmail(uEmail) && !isGenericEmail(mEmail) && uEmail === mEmail) {
-    return true;
-  }
-
-  return false;
-}
-
-function isUserInGroup(user, group) {
-  if (!user || !group) return false;
-  const uids = getUserIdentityKeys(user);
-  const email = (user.email || '').toLowerCase().trim();
-  const hasValidEmail = !isGenericEmail(email);
-
-  const isGroupAdmin = uids.some(u => u === group.adminId || u === group.admin?.id) ||
-    (hasValidEmail && group.admin?.email && group.admin.email.toLowerCase().trim() === email);
-  if (isGroupAdmin) return true;
-
-  const inMembers = (group.members || []).some(m => userMatchesMember(user, m));
-  if (inMembers) return true;
-
-  const inMemberUids = Array.isArray(group.memberUids) && (
-    uids.some(u => group.memberUids.includes(u)) ||
-    (hasValidEmail && group.memberUids.includes(email))
-  );
-  return inMemberUids;
+  const sharedEmail = userEmails.some((email) => memberEmails.includes(email.toLowerCase()));
+  return sharedId || sharedEmail;
 }
 
 /* ─────────────────── GROUPS ─────────────────── */
@@ -155,44 +113,48 @@ async function createGroup(req, res, next) {
 async function getMyGroups(req, res, next) {
   try {
     const user = req.user || {};
-    const uids = getUserIdentityKeys(user);
+    const uids = [
+      user.id,
+      user.uid,
+      user._id ? String(user._id) : null,
+      user.firebaseUid,
+    ].filter(Boolean);
+
     const email = (user.email || '').toLowerCase().trim();
-    const hasValidEmail = !isGenericEmail(email);
 
-    if (uids.length === 0 && !hasValidEmail) {
-      return res.json([]);
-    }
+    const orConditions = [
+      { memberUids: { $in: uids } },
+      { adminId: { $in: uids } },
+      { 'admin.id': { $in: uids } },
+      { 'members.userId': { $in: uids } },
+      { 'members.user.id': { $in: uids } },
+    ];
 
-    const orConditions = [];
-    if (uids.length > 0) {
-      orConditions.push(
-        { memberUids: { $in: uids } },
-        { adminId: { $in: uids } },
-        { 'admin.id': { $in: uids } },
-        { 'members.userId': { $in: uids } },
-        { 'members.user.id': { $in: uids } }
-      );
-    }
-
-    if (hasValidEmail) {
+    if (email) {
       orConditions.push(
         { 'admin.email': { $regex: new RegExp(`^${email}$`, 'i') } },
         { 'members.user.email': { $regex: new RegExp(`^${email}$`, 'i') } }
       );
     }
 
-    if (orConditions.length === 0) {
-      return res.json([]);
-    }
-
     const groups = await Group.find({ $or: orConditions }).sort({ updatedAt: -1 });
-    const uid = uids[0] || user.id;
+
+    // Auto-backfill current uid in memberUids if missing so future indexing is 100% synchronized
+    const uid = user.id || uids[0];
     const results = [];
 
     for (const group of groups) {
-      // Strictly verify this user is truly authorized for this group (no leakage)
-      if (!isUserInGroup(user, group)) {
-        continue;
+      let needsSave = false;
+      if (uid && !group.memberUids.includes(uid)) {
+        group.memberUids.push(uid);
+        needsSave = true;
+      }
+      if (!/^\d{8}$/.test(group.inviteToken || '')) {
+        group.inviteToken = generateInviteToken(group.id, group.name, group.adminId);
+        needsSave = true;
+      }
+      if (needsSave) {
+        group.save().catch(() => { });
       }
       results.push(group.toClientJSON(uid));
     }
@@ -208,22 +170,36 @@ async function getGroupById(req, res, next) {
   try {
     const { id } = req.params;
     const user = req.user || {};
-    const uids = getUserIdentityKeys(user);
+    const uids = [
+      user.id,
+      user.uid,
+      user._id ? String(user._id) : null,
+      user.firebaseUid,
+    ].filter(Boolean);
     const email = (user.email || '').toLowerCase().trim();
-    const hasValidEmail = !isGenericEmail(email);
-    const uid = uids[0] || user.id;
+    const uid = user.id || uids[0];
 
     const group = await Group.findOne({ id });
     if (!group) return res.status(404).json({ error: 'Group not found.' });
 
-    if (!isUserInGroup(user, group)) {
+    const isMember =
+      uids.some((u) => group.memberUids.includes(u) || group.adminId === u || group.admin?.id === u) ||
+      (group.members || []).some((m) => userMatchesMember(user, m)) ||
+      (email && group.admin?.email?.toLowerCase().trim() === email);
+
+    if (!isMember) {
       return res.status(403).json({ error: 'You are not a member of this group.' });
     }
 
-    // Auto-sync current user's latest name and avatar ONLY if they already exist in group
+    // Auto-sync current user's latest name, avatar, and uid into group members
     let modified = false;
+    if (uid && !group.memberUids.includes(uid)) {
+      group.memberUids.push(uid);
+      modified = true;
+    }
+
     group.members = (group.members || []).map((m) => {
-      const match = userMatchesMember(user, m);
+      const match = uids.includes(m.userId) || uids.includes(m.id) || uids.includes(m.user?.id) || (email && m.user?.email?.toLowerCase().trim() === email);
       if (match) {
         if (user.name && user.name !== 'Explorer' && user.name !== 'User' && user.name !== 'Pujo Explorer' && m.user?.name !== user.name) {
           m.user = { ...(m.user || {}), name: user.name };
@@ -237,9 +213,7 @@ async function getGroupById(req, res, next) {
       return m;
     });
 
-    const isGroupAdmin = uids.some(u => u === group.adminId || u === group.admin?.id) ||
-      (hasValidEmail && group.admin?.email && group.admin.email.toLowerCase().trim() === email);
-
+    const isGroupAdmin = uids.includes(group.adminId) || uids.includes(group.admin?.id) || (email && group.admin?.email?.toLowerCase().trim() === email);
     if (isGroupAdmin) {
       if (user.name && user.name !== 'Explorer' && user.name !== 'User' && user.name !== 'Pujo Explorer' && group.admin?.name !== user.name) {
         group.admin.name = user.name;
@@ -254,12 +228,13 @@ async function getGroupById(req, res, next) {
     if (modified) {
       group.markModified('members');
       group.markModified('admin');
-      group.save().catch(() => {});
+      group.markModified('memberUids');
+      await group.save().catch(() => { });
     }
 
     if (!/^\d{8}$/.test(group.inviteToken || '')) {
       group.inviteToken = generateInviteToken(group.id, group.name, group.adminId);
-      group.save().catch(() => {});
+      await group.save();
     }
 
     return res.json(group.toClientJSON(uid));
@@ -771,15 +746,6 @@ async function generateRoute(req, res, next) {
 async function getGroupMessages(req, res, next) {
   try {
     const { id } = req.params;
-    const user = req.user;
-
-    const group = await Group.findOne({ id }).select('id adminId admin members memberUids').lean();
-    if (!group) return res.status(404).json({ error: 'Group not found.' });
-
-    if (!isUserInGroup(user, group)) {
-      return res.status(403).json({ error: 'Access denied. You are not a member of this group.' });
-    }
-
     const messages = await Message.find({ groupId: id })
       .sort({ createdAt: 1 })
       .limit(500);
@@ -795,13 +761,6 @@ async function sendGroupMessage(req, res, next) {
     const { id } = req.params;
     const { text, type, imageUrl } = req.body;
     const user = req.user;
-
-    const group = await Group.findOne({ id }).select('id adminId admin members memberUids').lean();
-    if (!group) return res.status(404).json({ error: 'Group not found.' });
-
-    if (!isUserInGroup(user, group)) {
-      return res.status(403).json({ error: 'Access denied. You are not a member of this group.' });
-    }
 
     // Strictly enforce 1 MB limit for image uploads
     if (imageUrl && typeof imageUrl === 'string') {
@@ -841,15 +800,6 @@ async function sendGroupMessage(req, res, next) {
 async function getGroupLocations(req, res, next) {
   try {
     const { id } = req.params;
-    const user = req.user;
-
-    const group = await Group.findOne({ id }).select('id adminId admin members memberUids').lean();
-    if (!group) return res.status(404).json({ error: 'Group not found.' });
-
-    if (!isUserInGroup(user, group)) {
-      return res.status(403).json({ error: 'Access denied. You are not a member of this group.' });
-    }
-
     const list = await Presence.find({ groupId: id });
     return res.json(list);
   } catch (err) {
@@ -863,13 +813,6 @@ async function updateMemberLocation(req, res, next) {
     const { id } = req.params;
     const { latitude, longitude, accuracy, isSharingLocation, battery } = req.body;
     const user = req.user;
-
-    const group = await Group.findOne({ id }).select('id adminId admin members memberUids').lean();
-    if (!group) return res.status(404).json({ error: 'Group not found.' });
-
-    if (!isUserInGroup(user, group)) {
-      return res.status(403).json({ error: 'Access denied. You are not a member of this group.' });
-    }
 
     const presence = await Presence.findOneAndUpdate(
       { groupId: id, userId: user.id },

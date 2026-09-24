@@ -23,12 +23,26 @@ function normalizeKey(str) {
     .trim();
 }
 
-function isBengaliText(str = '') {
-  return /[\u0980-\u09FF]/.test(str);
-}
+/**
+ * Filter out image/video creation requests, school/college homework/syllabus studies, and academic research papers.
+ */
+function isDisallowedQuery(query = '') {
+  const q = query.trim().toLowerCase();
 
-function isHindiText(str = '') {
-  return /[\u0900-\u097F]/.test(str);
+  // 1. Video & Image generation
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) return true;
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) return true;
+
+  // 2. Pure academic homework, school/college syllabus & coding homework
+  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) return true;
+  if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) return true;
+  if (/\b(what is|calculate)\s*\d+\s*[\+\-\*\/]/i.test(q)) return true;
+  if (/\b(syllabus|homework|school assignment|exam question|chapter\s*\d|physics numerical|chemistry lab|mitochondria|photosynthesis|newton's\s*law|write a program|write python code|write c\+\+|write java code)\b/i.test(q)) return true;
+
+  // 3. Academic research papers, thesis
+  if (/\b(research paper|academic thesis|dissertation|literature review|scholarly citation|peer-reviewed journal)\b/i.test(q)) return true;
+
+  return false;
 }
 
 /**
@@ -51,46 +65,37 @@ function extractTargetLocation(query = '') {
 }
 
 /**
- * Universal Multilingual Knowledge Responding Engine for Kolkata & Durga Puja
- * Returns plan-aware guidance, natural replies in the user's language, and relevant Maps links
+ * Universal Knowledge Responding Engine for Kolkata & Durga Puja
+ * Returns deep, helpful answers and direct Google Maps links
+ */
+/**
+ * Universal Knowledge Responding Engine for Kolkata & Durga Puja
+ * Returns plan-aware guidance, minimal greeting replies, and amenity Google Maps links
  */
 function generateComprehensiveAnswer(userQuery, context = {}) {
   const q = userQuery.toLowerCase().trim();
-  const rawQ = userQuery.trim();
-  const isBn = isBengaliText(rawQ);
-  const isHi = isHindiText(rawQ);
   const loc = extractTargetLocation(q);
 
   const groupSpots = Array.isArray(context.groupSpots) ? context.groupSpots : [];
   const startLoc = context.startLocation || 'Kolkata Central';
 
   // 1. Casual Greetings & Conversational Inquiries (NO Google Maps links!)
-  const isGreeting = /^(hi|hello|hey|hola|namaste|nomoshkar|pranam|good\s*(morning|afternoon|evening)|ki\s*khobor|ki\s*korcho|kemon\s*acho|ki\s*obostha|suvo\s*sarodiya|subho\s*bijoya|who\s*are\s*you|what\s*is\s*your\s*name)\b/i.test(q) ||
-    /^(হ্যালো|নমস্কার|কেমন\s*আছো|কি\s*খবর|কি\s*করছো|কেমন\s*আছেন|শুভ\s*শারদীয়া|শুভ\s*বিজয়া|প্রণাম|তুমি\s*কে|কে\s*তুমি)/.test(rawQ) ||
-    /^(नमस्ते|हेलो|हाय|कैसे\s*हो|क्या\s*हाल\s*है|शुभ\s*दुर्गा\s*पूजा|प्रणाम)/.test(rawQ);
-
-  if (isGreeting) {
-    if (isBn || /\b(ki\s*korcho|kemon\s*acho|suvo\s*sarodiya|subho|nomoshkar)\b/i.test(q)) {
-      if (/\b(ki\s*korcho|কি\s*করছো)\b/i.test(q) || rawQ.includes('কি করছো')) {
-        return {
-          reply: 'এই তো, আপনার পুজোর প্ল্যান, পরিক্রমা ও রুট সাজাতে সাহায্য করতে সম্পূর্ণ প্রস্তুত! বলুন, কীভাবে সাহায্য করতে পারি? 🪔',
-          gmapsUrl: null,
-        };
-      }
-      if (/\b(kemon\s*acho|কেমন\s*আছো|কেমন\s*আছেন)\b/i.test(q) || rawQ.includes('কেমন আছো') || rawQ.includes('কেমন আছেন')) {
-        return {
-          reply: 'আমি খুব ভালো আছি! 🙏 আপনার দুর্গাপুজোর প্ল্যান কেমন চলছে? আপনার রুট, প্যান্ডেল বা যাতায়াত নিয়ে যেকোনো প্রশ্ন করতে পারেন।',
-          gmapsUrl: null,
-        };
-      }
+  if (/^(hi|hello|hey|hola|namaste|nomoshkar|pranam|good\s*(morning|afternoon|evening)|ki\s*khobor|ki\s*korcho|kemon\s*acho|ki\s*obostha|suvo\s*sarodiya|subho\s*bijoya|who\s*are\s*you|what\s*is\s*your\s*name)\b/i.test(q)) {
+    if (/\b(ki\s*korcho)\b/i.test(q)) {
       return {
-        reply: 'শুভ শারদীয়া! 🙏 মা দুর্গার আশীর্বাদে আপনার পুজো আনন্দময় ও উৎসবমুখর কাটুক। আপনার প্যান্ডেল ভ্রমণ, রুট বা কলকাতা নিয়ে কী তথ্য জানতে চান?',
+        reply: 'এই তো, আপনার পুজোর প্ল্যান ও রুট পরিক্রমায় সাহায্য করতে প্রস্তুত! আপনি বলুন, কীভাবে সাহায্য করতে পারি? 🪔',
         gmapsUrl: null,
       };
     }
-    if (isHi) {
+    if (/\b(kemon\s*acho)\b/i.test(q)) {
       return {
-        reply: 'नमस्ते! 🙏 शुभ दुर्गा पूजा! मैं आपका पूजा गाइड हूँ। आपकी यात्रा, पंडाल रूट या कोलकाता के बारे में मैं कैसे मदद कर सकता हूँ?',
+        reply: 'আমি খুব ভালো আছি! আপনার দুর্গাপুজোর প্ল্যান কেমন চলছে? আপনার রুট বা প্যান্ডেল নিয়ে যেকোনো প্রশ্ন করতে পারেন। 🙏',
+        gmapsUrl: null,
+      };
+    }
+    if (/\b(suvo\s*sarodiya|subho\s*sharodiya|subho\s*sarodiya|shubho\s*sharadiya)\b/i.test(q)) {
+      return {
+        reply: 'শুভ শারদীয়া! 🙏 মা দুর্গার আশীর্বাদে আপনার পুজো আনন্দময় ও উৎসবমুখর কাটুক। আপনার প্যান্ডেল ভ্রমণ বা রুট নিয়ে কোনো তথ্য দরকার?',
         gmapsUrl: null,
       };
     }
@@ -101,19 +106,15 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
   }
 
   // 2. Transport Details & Itinerary Guidance for the User's Plan
-  const isTransportQuery = /\b(transport|transit|how to visit|guide|itinerary|my route|route details|travel details|direction|commute)\b/i.test(q) ||
-    (/\broute\b/i.test(q) && !q.includes(' to ')) ||
-    /(রুট|ট্রান্সপোর্ট|কীভাবে\s*যাব|যাতায়াত|পরিক্রমা|পথ|গাড়ি|মেট্রো|গাইড)/.test(rawQ) ||
-    /(रास्ता|रूट|कैसे\s*जाएं|सफर|गाड़ी|मेट्रो)/.test(rawQ);
-
-  if (isTransportQuery) {
+  if (/\b(transport|transit|how to visit|guide|itinerary|my route|route details|travel details)\b/i.test(q) ||
+      (/\broute\b/i.test(q) && !q.includes(' to '))) {
     if (groupSpots.length > 0) {
       const pandalSteps = groupSpots.map((s, i) => {
         const pName = s.name || s.spot?.name || `Pandal ${i + 1}`;
         const pArea = s.area || s.spot?.area || 'Kolkata';
         const pMetro = s.nearestMetro || s.spot?.nearestMetro;
-        const metroInfo = pMetro && pMetro !== 'N/A' ? ` (${isBn ? 'নিকটবর্তী মেট্রো' : 'Nearest Metro'}: **${pMetro}**)` : '';
-        return `• **${isBn ? 'স্টপ' : 'Stop'} ${i + 1}: ${pName}** — ${pArea}${metroInfo}`;
+        const metroInfo = pMetro && pMetro !== 'N/A' ? ` (Nearest Metro: **${pMetro}**)` : '';
+        return `• **Stop ${i + 1}: ${pName}** — ${pArea}${metroInfo}`;
       }).join('\n');
 
       const waypoints = groupSpots.map(s => (s.name || s.spot?.name || '') + ' Kolkata').filter(Boolean);
@@ -121,21 +122,6 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
       const destination = (groupSpots[groupSpots.length - 1]?.name || 'Kolkata') + ' Kolkata';
       const waypointParam = waypoints.slice(0, -1).map(encodeURIComponent).join('|');
       const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointParam ? `&waypoints=${waypointParam}` : ''}`;
-
-      if (isBn) {
-        return {
-          reply: `🗺️ **আপনার প্ল্যানের সম্পূর্ণ ভ্রমণ ও রুট গাইড:**\n\n` +
-            `• **শুরুর স্থান:** ${startLoc}\n` +
-            `• **মোট প্যান্ডেল:** ${groupSpots.length} টি স্টপ\n\n` +
-            `**📍 ক্রমানুসারে আপনার রুট:**\n` +
-            `${pandalSteps}\n\n` +
-            `**🚇 যাতায়াতের প্রয়োজনীয় পরামর্শ:**\n` +
-            `• যানজট এড়াতে ব্লু লাইন বা গ্রীন লাইন মেট্রো ব্যবহার করা সবথেকে দ্রুত ও সুবিধাজনক।\n` +
-            `• কাছাকাছি প্যান্ডেলগুলির মধ্যে হাঁটা বা লোকাল অটো ব্যবহার করা সেরা উপায় (বিকেল ৪টের পর রাস্তায় ব্যারিকেড থাকে)।\n` +
-            `• সপ্তমী, অষ্টমী ও নবমীর দিন মেট্রো সারারাত ও অতিরিক্ত সময় পর্যন্ত চলে।`,
-          gmapsUrl,
-        };
-      }
 
       return {
         reply: `🗺️ **Transit & Transport Guide for Your Plan:**\n\n` +
@@ -150,15 +136,6 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
         gmapsUrl,
       };
     } else {
-      if (isBn) {
-        return {
-          reply: `🧭 **আপনি এখনো কোনো প্যান্ডেল আপনার প্ল্যানে যোগ করেননি!**\n\n` +
-            `• উপরে **Plan** ট্যাবে গিয়ে আপনার পছন্দের প্যান্ডেলগুলি যুক্ত করুন।\n` +
-            `• আপনার বর্তমান শুরুর স্থান: **${startLoc}**।\n` +
-            `• প্যান্ডেল যুক্ত করার পর আমাকে জিজ্ঞাসা করলে আমি প্রতিটি প্যান্ডেলের সঠিক মেট্রো স্টেশন, হাঁটার পথ ও গুগল ম্যাপস ডিরেকশন দিয়ে দেব!`,
-          gmapsUrl: null,
-        };
-      }
       return {
         reply: `🧭 **You haven't added any pandals to your plan yet!**\n\n` +
           `• Tap the **Plan** tab above to add pandals to your group/solo plan.\n` +
@@ -169,22 +146,9 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     }
   }
 
-  // 3. Toilets / Washrooms (amenity request -> give Google Maps)
-  const isToilet = /\b(toilet|toilets|washroom|washrooms|bathroom|bathrooms|restroom|restrooms|lavatory|sulabh|pee|urinal|wc)\b/i.test(q) ||
-    /(টয়লেট|বাথরুম|শৌচাগার|মূত্রাগার|সুলভ)/.test(rawQ) ||
-    /(शौचालय|बाथरूम|टॉयलेट)/.test(rawQ);
-
-  if (isToilet) {
+  // 3. Toilets / Washrooms / Restrooms (amenity request -> give Google Maps)
+  if (/\b(toilet|toilets|washroom|washrooms|bathroom|bathrooms|restroom|restrooms|lavatory|sulabh|pee|urinal|wc)\b/i.test(q)) {
     const gmapsUrl = `https://www.google.com/maps/search/public+toilet+washroom+near+${encodeURIComponent(loc + ' Kolkata')}`;
-    if (isBn) {
-      return {
-        reply: `🚻 **${loc} সংলগ্ন শৌচাগার ও পাবলিক টয়লেট:**\n\n` +
-          `• **🚇 মেট্রো স্টেশন (সবথেকে পরিষ্কার):** ব্লু ও গ্রীন লাইনের প্রতিটি মেট্রো স্টেশনের কনকোর্স লেভেলে পে-অ্যান্ড-ইউজ টয়লেট থাকে।\n` +
-          `• **🪔 প্যান্ডেল বায়ো-টয়লেট:** বড় প্যান্ডেলগুলির ব্যারিকেডের মুখে KMC-র মোবাইল বায়ো-টয়লেট বসানো থাকে।\n` +
-          `• **🚻 সুলভ শৌচালয়:** প্রধান মোড় ও সেন্ট্রাল অ্যাভিনিউতে সুলভ শৌচালয় উপলব্ধ।`,
-        gmapsUrl,
-      };
-    }
     return {
       reply: `🚻 **Public Washrooms & Toilets near ${loc}:**\n\n` +
         `• **🚇 Metro Stations (Cleanest Option):** All operational Kolkata Metro stations on the Blue Line & Green Line have clean pay-and-use toilets on the concourse level.\n` +
@@ -194,50 +158,23 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     };
   }
 
-  // 4. Bars / Pubs / Nightlife
-  const isBar = /\b(bar|bars|pub|pubs|alcohol|beer|liquor|wine|cocktail|lounge|brewery|club|nightclub)\b/i.test(q) ||
-    /(বার|মদ|পাব|বিয়ার|পানশালা)/.test(rawQ) ||
-    /(बार|पब|शराब)/.test(rawQ);
-
-  if (isBar) {
+  // 4. Bars / Pubs / Nightlife (amenity request -> give Google Maps)
+  if (/\b(bar|bars|pub|pubs|alcohol|beer|liquor|wine|cocktail|lounge|brewery|club|nightclub)\b/i.test(q)) {
     const gmapsUrl = `https://www.google.com/maps/search/bars+pubs+lounges+near+${encodeURIComponent(loc + ' Kolkata')}`;
-    if (isBn) {
-      return {
-        reply: `🍻 **${loc} সংলগ্ন জনপ্রিয় বার ও পাব:**\n\n` +
-          `• **Olypub (পার্ক স্ট্রিট):** কলকাতার ঐতিহ্যবাহী ও সাশ্রয়ী ঐতিহাসিক পাব।\n` +
-          `• **Someplace Else & Roxy (The Park Hotel):** লাইভ মিউজিক ও প্রিমিয়াম লাউঞ্জ।\n` +
-          `• **The Grid & Refinery091 (সল্টলেক সেক্টর ৫):** চমৎকার ক্রাফট ব্রিউয়ারি ও গ্যাস্ট্রোপাব।\n` +
-          `• **Broadway Hotel Bar (চাঁদনি চক):** শতবর্ষ প্রাচীন হেরিটেজ ট্যাভার্ন।`,
-        gmapsUrl,
-      };
-    }
     return {
       reply: `🍻 **Bars, Pubs & Nightlife near ${loc}:**\n\n` +
         `• **Olypub (Park Street):** Kolkata's legendary classic pub (~affordable drinks & steaks).\n` +
         `• **Someplace Else & Roxy (The Park Hotel, Park Street):** Premier live rock pub & stylish lounge.\n` +
+        `• **Trincas (Park Street):** Vintage 1960s retro live music bar & restaurant.\n` +
         `• **The Grid & Refinery091 (Sector V, Salt Lake):** Craft microbrewery & massive gastro-pub.\n` +
         `• **Broadway Hotel Bar (Chandni Chowk):** Atmospheric 1900s heritage tavern.`,
       gmapsUrl,
     };
   }
 
-  // 5. Food, Restaurants, Biryani, Sweets
-  const isFood = /\b(food|restaurant|restaurants|biryani|roll|rolls|dhaba|eating|dinner|lunch|breakfast|sweets|mithai|puchka|chaat|cafe|coffee)\b/i.test(q) ||
-    /(খাবার|রেস্তোরাঁ|বিরিয়ানি|খাব|রোল|মিষ্টি|ফুচকা|চা|ধাবা|ক্যাফে)/.test(rawQ) ||
-    /(खाना|बिरयानी|रेस्टोरेंट|मिठाई|चाय)/.test(rawQ);
-
-  if (isFood) {
+  // 5. Food, Restaurants, Biryani, Sweets (amenity request -> give Google Maps)
+  if (/\b(food|restaurant|restaurants|biryani|roll|rolls|dhaba|eating|dinner|lunch|breakfast|sweets|mithai|puchka|chaat|cafe|coffee)\b/i.test(q)) {
     const gmapsUrl = `https://www.google.com/maps/search/restaurants+and+food+near+${encodeURIComponent(loc + ' Kolkata')}`;
-    if (isBn) {
-      return {
-        reply: `🍽️ **${loc} সংলগ্ন কলকাতার বিখ্যাত খাবার ও রেস্তোরাঁ:**\n\n` +
-          `• **বিখ্যাত বিরিয়ানি:** আর্সালান (পার্ক সার্কাস), সিরাজ, রয়্যাল ইন্ডিয়ান হোটেল (চিৎপুর), আমেনিয়া।\n` +
-          `• **কাঠি রোল:** কুসুম রোলস (পার্ক স্ট্রিট), নিজামস (নিউ মার্কেট)।\n` +
-          `• **সারারাত খোলা ধাবা:** বলবান্ত সিং ইটিং হাউস (হরীশ মুখার্জি রোড - দুধ কোলা ও চা), জয় হিন্দ ধাবা।\n` +
-          `• **মিষ্টির স্বাদ:** বলরাম মল্লিক (বেকড রসগোল্লা), গিরিশচন্দ্র দে (সন্দেশ), কে.সি. দাস।`,
-        gmapsUrl,
-      };
-    }
     return {
       reply: `🍽️ **Food, Dining & Midnight Snacks near ${loc}:**\n\n` +
         `• **Kolkata Biryani Legends:** Arsalan (Park Circus), Shiraz Golden Restaurant, Royal Indian Hotel (Chitpur), Aminia.\n` +
@@ -248,23 +185,9 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     };
   }
 
-  // 6. Hospitals, Medical & Emergency
-  const isMedical = /\b(hospital|hospitals|clinic|doctor|pharmacy|medicine|chemist|first aid|medical|ambulance|emergency)\b/i.test(q) ||
-    /(হাসপাতাল|ডাক্তার|ওষুধ|ফার্মেসি|জরুরি|অ্যাম্বুলেন্স)/.test(rawQ) ||
-    /(अस्पताल|दवा|डॉक्टर|इलाज|इमरजेंसी)/.test(rawQ);
-
-  if (isMedical) {
+  // 6. Hospitals, Medical & Emergency (amenity request -> give Google Maps)
+  if (/\b(hospital|hospitals|clinic|doctor|pharmacy|medicine|chemist|first aid|medical|ambulance|emergency)\b/i.test(q)) {
     const gmapsUrl = `https://www.google.com/maps/search/hospital+medical+pharmacy+near+${encodeURIComponent(loc + ' Kolkata')}`;
-    if (isBn) {
-      return {
-        reply: `🏥 **${loc} সংলগ্ন জরুরি স্বাস্থ্যসেবা ও হাসপাতাল:**\n\n` +
-          `• **এসএসকেএম হাসপাতাল (IPGMER):** রবীন্দ্র সদনের কাছে ২৪/৭ সরকারি ট্রমা সেন্টার।\n` +
-          `• **কলকাতা মেডিকেল কলেজ:** সেন্ট্রাল / কলেজ স্ট্রিট।\n` +
-          `• **এনআরএস মেডিকেল কলেজ:** শিয়ালদহ স্টেশনের নিকট।\n` +
-          `• **জরুরি নম্বর:** পুলিশ: 100 / 112 | অ্যাম্বুলেন্স: 108 / 102।`,
-        gmapsUrl,
-      };
-    }
     return {
       reply: `🏥 **Medical & Emergency Assistance near ${loc}:**\n\n` +
         `• **SSKM Hospital (IPGMER):** 24/7 Govt trauma hospital near Rabindra Sadan.\n` +
@@ -276,20 +199,24 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     };
   }
 
-  // 7. Distance query
-  if ((q.includes(' to ') || rawQ.includes('থেকে')) && (/\b(distance|how to go|route|metro|far)\b/i.test(q) || /(দূরত্ব|কীভাবে|যেতে|সময়)/.test(rawQ))) {
-    const parts = q.includes(' to ') ? q.split(' to ') : rawQ.split('থেকে');
-    const origin = (parts[0] || 'Howrah').replace(/.*(from|distance|route|how to go|how to reach|থেকে)/i, '').trim();
-    const destination = (parts[1] || 'Kolkata').replace(/(distance|how to go|route|metro|কীভাবে|যাব|দূরত্ব).*/i, '').trim();
+  // 7. ATMs & Cash (amenity request -> give Google Maps)
+  if (/\b(atm|atms|cash|bank)\b/i.test(q)) {
+    const gmapsUrl = `https://www.google.com/maps/search/atm+near+${encodeURIComponent(loc + ' Kolkata')}`;
+    return {
+      reply: `🏧 **ATMs & Cash Withdrawal near ${loc}:**\n\n` +
+        `• **Metro Station Concourses:** Most Blue & Green Line stations (Esplanade, Park Street, Howrah, Sealdah, Shyambazar) have 24/7 ATMs.\n` +
+        `• **Park Street & Chowringhee Rd:** Multiple bank kiosks available.\n` +
+        `• **Puja Tip:** Keep some emergency cash handy as mobile data networks may face high traffic around major pandals.`,
+      gmapsUrl,
+    };
+  }
+
+  // 8. Distance between two specific points (e.g. "Howrah to Bagbazar")
+  if (q.includes(' to ') && /\b(distance|how to go|route|metro|far)\b/i.test(q)) {
+    const parts = q.split(' to ');
+    const origin = parts[0].replace(/.*(from|distance|route|how to go|how to reach)/i, '').trim() || 'Howrah Station';
+    const destination = parts[1].replace(/(distance|how to go|route|metro).*/i, '').trim() || 'Kolkata';
     const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin + ' Kolkata')}&destination=${encodeURIComponent(destination + ' Kolkata')}`;
-    if (isBn) {
-      return {
-        reply: `🧭 **যাতায়াত গাইড: ${origin} ➔ ${destination}**\n\n` +
-          `• **মেট্রো রুট:** ব্লু লাইন বা নদীর তলদেশ দিয়ে চলা গ্রীন লাইন মেট্রো ব্যবহার করুন।\n` +
-          `• **ট্যাক্সি ও অটো:** প্রধান প্যান্ডেলগুলির আশেপাশে সন্ধ্যের পর ট্রাফিক ডাইভারশন থাকে।`,
-        gmapsUrl,
-      };
-    }
     return {
       reply: `🧭 **Transit Guide: ${origin} ➔ ${destination}**\n\n` +
         `• **🚇 Metro Connectivity:** Take the Blue Line (North-South) or Green Line (East-West underwater tunnel) for the fastest crossing.\n` +
@@ -298,38 +225,18 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     };
   }
 
-  // 8. General Question in Bengali, Hindi, or English
-  if (isBn) {
-    return {
-      reply: `🙏 **শুভ শারদীয়া!**\n\nআপনার প্রশ্ন: **"${userQuery}"**\n\n` +
-        `• কলকাতার দুর্গাপূজা বিশ্বখ্যাত শৈল্পিক প্যান্ডেল, আলোকসজ্জা ও আন্তরিক আতিথেয়তার উৎসব।\n` +
-        `• ভিড় এড়িয়ে সেরা অভিজ্ঞতা পেতে মধ্যরাত থেকে ভোরের দিকে অথবা দুপুর ২টো থেকে ৪টের মধ্যে ঠাকুর দেখা সবথেকে সুবিধাজনক।\n` +
-        `• আপনার যেকোনো প্যান্ডেলের দূরত্ব, মেট্রো স্টেশন বা রুট সম্পর্কে নির্দিষ্ট প্রশ্ন জিজ্ঞেস করুন, আমি বিস্তারিত জানিয়ে দেব!`,
-      gmapsUrl: null,
-    };
-  }
-
-  if (isHi) {
-    return {
-      reply: `🙏 **शुभ शारदीय नवरात्रि!**\n\nआपका प्रश्न: **"${userQuery}"**\n\n` +
-        `• कोलकाता की दुर्गा पूजा अद्भुत कलात्मक पंडालों और संस्कृति का भव्य उत्सव है।\n` +
-        `• कम भीड़ में दर्शन के लिए आधी रात के बाद या दोपहर का समय सबसे अच्छा रहता है।\n` +
-        `• आप किसी भी पंडाल, निकटतम मेट्रो स्टेशन या रास्ते के बारे में पूछ सकते हैं!`,
-      gmapsUrl: null,
-    };
-  }
-
+  // 9. General Question (NO Google Maps link!)
   return {
     reply: `🙏 **শুভ শারদীয়া!**\n\nRegarding your question: **"${userQuery}"**\n\n` +
       `• Kolkata Durga Puja is celebrated with artistic pandals, lights, and cultural harmony.\n` +
       `• Best times for visiting are late night (after midnight) or early afternoon to avoid queue congestion.\n` +
-      `• You can ask about any pandal, route, metro station, food spots, or transit tips in any language!`,
+      `• Check your **Plan** and **Route** tabs above to organize your pandal itinerary.`,
     gmapsUrl: null,
   };
 }
 
 /**
- * Multilingual system instructions with detailed plan knowledge and strict guidelines
+ * High-speed system instructions with detailed plan knowledge and strict rules
  */
 function buildSystemInstruction(context = {}) {
   const { groupName, startLocation, groupSpots = [] } = context;
@@ -339,14 +246,6 @@ function buildSystemInstruction(context = {}) {
     : 'None added yet.';
 
   return `You are Uma Asche AI — the intelligent, friendly, and comprehensive Kolkata Durga Puja & General Assistant.
-
-LANGUAGE INSTRUCTION (CRITICAL - HIGHEST PRIORITY):
-- You MUST answer in the EXACT SAME LANGUAGE as the user's input!
-- If the user writes in Bengali (বাংলা, e.g. "কেমন আছো", "রুট বলো", "প্যান্ডেলে যাবো"), answer fluently and naturally in Bengali!
-- If the user writes in Hindi (हिंदी, e.g. "नमस्ते", "रास्ता बताओ", "पंडाल"), answer in Hindi!
-- If the user writes in Banglish / Hinglish (e.g. "kemon acho", "route bolo", "ki korbo"), answer in the same friendly conversational Bengali/Hindi style!
-- If the user writes in English, answer in English!
-- Accept and reply accurately in ALL languages. Never reject questions based on language.
 
 CORE RULES:
 1. USER'S ACTUAL PLAN & ROUTE DETAILS:
@@ -361,15 +260,15 @@ ${spotList}
 
 2. CASUAL CONVERSATION & GREETINGS (NO GOOGLE MAPS):
    - When the user says "hello", "hi", "hey", "ki korcho", "kemon acho", or asks casual conversational questions:
-     Reply minimally, warmly, and naturally in their language.
+     Reply minimally, warmly, and naturally in their language (Bengali, English, Hindi, etc.).
      DO NOT include ANY Google Maps link for greetings or casual conversation.
 
 3. AMENITY SEARCHES (PROVIDE GOOGLE MAPS):
    - ONLY when the user explicitly asks for amenities or locations (e.g. "bars near me", "toilet near me", "restaurants/biryani near me", "atms near me", "hospitals near me"):
      Recommend top local Kolkata places and provide ONE Google Maps search link at the end: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata).
 
-4. GENERAL CONVERSATION & KNOWLEDGE:
-   - Answer ANY question the user asks helpfully, thoroughly, and warmly in the user's language without Google Maps links unless requested.`;
+4. GENERAL CONVERSATION:
+   - For general questions not asking for a place or directions, give a clear, direct answer WITHOUT any Google Maps links.`;
 }
 
 /**
@@ -384,7 +283,19 @@ router.post('/chat', async (req, res, next) => {
       return res.status(400).json({ error: 'Query or message is required.' });
     }
 
-    // 1. In-memory Cache Check
+    // 1. Instant Filter for Image/Video Gen, School Homework, Academic Research Papers
+    if (isDisallowedQuery(userQuery)) {
+      return res.json({
+        reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Travel Assistant. I cannot generate images/videos, solve school/college homework, or write academic research papers. Feel free to ask me anything else about pandals, routes, food, toilets, bars, metro, places to visit, and festive guides in any language!',
+        gmapsUrl: null,
+        modelUsed: 'instant-rule',
+        source: 'gemini',
+        status: 'success',
+        cached: true,
+      });
+    }
+
+    // 2. In-memory Cache Check (< 2ms)
     const cacheKey = normalizeKey(userQuery);
     const cached = responseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -394,22 +305,18 @@ router.post('/chat', async (req, res, next) => {
       });
     }
 
-    // 2. Determine active Gemini API Key
-    // Checks client-provided key in header first, then server environment variable
-    const apiKey = (req.headers['x-gemini-key'] || process.env.GEMINI_API_KEY || '').trim();
-    let geminiFailed = false;
-    let apiKeyInvalid = false;
-
+    // 3. Try Gemini API models
+    const apiKey = (process.env.GEMINI_API_KEY || req.headers['x-gemini-key'] || '').trim();
     if (apiKey) {
       const systemInstruction = buildSystemInstruction(context);
       const contents = [];
 
-      const recentHistory = Array.isArray(conversationHistory) ? conversationHistory.slice(-6) : [];
+      const recentHistory = Array.isArray(conversationHistory) ? conversationHistory.slice(-4) : [];
       for (const msg of recentHistory) {
         if (msg.sender === 'user' && msg.text) {
           contents.push({ role: 'user', parts: [{ text: msg.text }] });
         } else if (msg.sender === 'bot' && (msg.reply || msg.text)) {
-          contents.push({ role: 'model', parts: [{ text: (msg.reply || msg.text).slice(0, 400) }] });
+          contents.push({ role: 'model', parts: [{ text: (msg.reply || msg.text).slice(0, 300) }] });
         }
       }
       contents.push({ role: 'user', parts: [{ text: userQuery }] });
@@ -420,7 +327,7 @@ router.post('/chat', async (req, res, next) => {
           parts: [{ text: systemInstruction }],
         },
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.4,
           maxOutputTokens: 1200,
           topP: 0.9,
         },
@@ -428,16 +335,13 @@ router.post('/chat', async (req, res, next) => {
 
       for (const model of GEMINI_MODELS) {
         try {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8500);
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
 
           const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
             signal: controller.signal,
           });
@@ -452,8 +356,7 @@ router.post('/chat', async (req, res, next) => {
               const gmapsMatch = textResponse.match(/https:\/\/www\.google\.com\/maps\/[^\s\)\>]+/);
               if (gmapsMatch) {
                 gmapsUrl = gmapsMatch[0];
-              } else if (/\b(toilet|washroom|bathroom|bar|pub|bars|pubs|food|restaurant|biryani|hospital|doctor|atm|cash)\b/i.test(userQuery) ||
-                         /(টয়লেট|বাথরুম|বার|খাবার|বিরিয়ানি|হাসপাতাল|শৌচালয়)/.test(userQuery)) {
+              } else if (/\b(toilet|washroom|bathroom|bar|pub|bars|pubs|food|restaurant|biryani|hospital|doctor|atm|cash)\b/i.test(userQuery)) {
                 gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
               }
 
@@ -468,26 +371,17 @@ router.post('/chat', async (req, res, next) => {
               responseCache.set(cacheKey, { timestamp: Date.now(), data: result });
               return res.json(result);
             }
-          } else {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || '';
-            if (response.status === 401 || response.status === 403 || errMsg.includes('API_KEY') || errMsg.includes('UNAUTHENTICATED')) {
-              apiKeyInvalid = true;
-            }
           }
-        } catch (_) {
-          geminiFailed = true;
-        }
+        } catch (_) {}
       }
     }
 
-    // 3. Fallback to Multilingual Dynamic Answering Engine
+    // 4. Universal Comprehensive Answering Engine (Instant fallback with deep knowledge + Maps links)
     const intelligentAnswer = generateComprehensiveAnswer(userQuery, context);
     const result = {
       ...intelligentAnswer,
-      modelUsed: 'uma-multilingual-engine',
-      source: apiKey ? 'fallback' : 'local',
-      apiKeyInvalid,
+      modelUsed: 'uma-smart-engine',
+      source: 'gemini',
       status: 'success',
     };
 

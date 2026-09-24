@@ -12,7 +12,6 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@stream-io/node-sdk": "^0.4.26",
     "axios": "^1.7.2",
     "cors": "^2.8.5",

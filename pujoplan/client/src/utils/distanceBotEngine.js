@@ -190,12 +190,26 @@ export function findNearbyPandals(targetLat, targetLng, maxCount = 5, maxRadiusK
 // Master NLP query processor
 export async function processDistanceQuery(userQuery, userLocation = null) {
   const text = normalize(userQuery);
-  const rawQ = (userQuery || '').trim();
-  const isBn = /[\u0980-\u09FF]/.test(rawQ);
-  const isHi = /[\u0900-\u097F]/.test(rawQ);
 
-  // 1. Bathroom / Washroom / Toilet Search with direct Google Maps Link
-  if (isBathroomQuery(userQuery) || /(টয়লেট|বাথরুম|শৌচাগার|মূত্রাগার)/.test(rawQ) || /(शौचालय|बाथरूम)/.test(rawQ)) {
+  // 1. Math / Syllabus / Academic Filter (Strictly reject non-puja questions)
+  if (isMathOrSyllabus(userQuery)) {
+    return {
+      type: 'off_topic',
+      reply: '🙏 শুভ শারদীয়া!',
+      details: [
+        'I only assist with Kolkata Durga Puja plans, pandal distances, transit routes (e.g. "Howrah to Maidan distance how to go"), and public washrooms.',
+        'I do not solve maths, syllabus, or academic questions.',
+      ],
+      suggestions: [
+        'Howrah to Maidan distance',
+        'Find bathrooms near me',
+        'Shortest route for our group plan',
+      ],
+    };
+  }
+
+  // 2. Bathroom / Washroom / Toilet Search with direct Google Maps Link
+  if (isBathroomQuery(userQuery)) {
     const entities = extractEntities(userQuery);
     let targetName = 'Your Location';
     let gmapsUrl = 'https://www.google.com/maps/search/public+toilet+washroom+kolkata';
@@ -206,25 +220,6 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     } else if (userLocation && userLocation.latitude && userLocation.longitude) {
       targetName = 'your current GPS location';
       gmapsUrl = `https://www.google.com/maps/search/public+toilet+washroom+near+me/@${userLocation.latitude},${userLocation.longitude},15z`;
-    }
-
-    if (isBn) {
-      return {
-        type: 'bathroom_card',
-        reply: `🚻 **${targetName} সংলগ্ন শৌচাগার ও পাবলিক টয়লেট:**`,
-        locationName: targetName,
-        gmapsUrl,
-        details: [
-          '🚇 **মেট্রো স্টেশন**: ব্লু ও গ্রীন লাইনের প্রতিটি স্টেশনের কনকোর্সে পরিষ্কার পে-অ্যান্ড-ইউজ টয়লেট থাকে।',
-          '🪔 **প্যান্ডেল বায়ো-টয়লেট**: বড় প্যান্ডেলগুলির বাইরে মোবাইল বায়ো-টয়লেট বসানো থাকে।',
-          '🚻 **সুলভ শৌচালয়**: প্রধান মোড়ে ও রাস্তার সংযোগস্থলে সুলভ শৌচালয় উপলব্ধ।',
-        ],
-        suggestions: [
-          'Find bathrooms near me',
-          'Howrah to Maidan distance',
-          'Pandals near my GPS location',
-        ],
-      };
     }
 
     return {
@@ -245,38 +240,16 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // 2. Greetings & General Inquiries
-  if (/^(hi|hello|hey|namaste|shubho|nomoshkar|help|who are you|kemon acho)/.test(text) ||
-      /^(হ্যালো|নমস্কার|কেমন\s*আছো|কি\s*খবর|কি\s*করছো|শুভ\s*শারদীয়া)/.test(rawQ) ||
-      /^(नमस्ते|हेलो|हाय|कैसे\s*हो)/.test(rawQ)) {
-    if (isBn || /\b(ki korcho|kemon acho|subho|nomoshkar)\b/i.test(text)) {
-      return {
-        type: 'greeting',
-        reply: 'শুভ শারদীয়া! 🙏 আমি আপনার পূজা গাইড। রুট, প্যান্ডেল বা যাতায়াত নিয়ে কী জানতে চান?',
-        suggestions: [
-          'হাউড়া থেকে বাগবাজার দূরত্ব',
-          'কাছের বাথরুম কোথায়',
-          'আমার রুট গাইড বলো',
-        ],
-      };
-    }
-    if (isHi) {
-      return {
-        type: 'greeting',
-        reply: 'नमस्ते! 🙏 शुभ दुर्गा पूजा! मैं आपका पूजा गाइड हूँ। आपकी यात्रा और पंडाल के बारे में मैं क्या मदद कर सकता हूँ?',
-        suggestions: [
-          'Howrah to Maidan distance',
-          'Find bathrooms near me',
-        ],
-      };
-    }
+  // 3. Greetings & General Inquiries
+  if (/^(hi|hello|hey|namaste|shubho|nomoshkar|help|who are you|kemon acho)/.test(text)) {
     return {
       type: 'greeting',
-      reply: 'শুভ শারদীয়া! 🙏 How can I assist with your puja route, pandals, or Kolkata transit today?',
+      reply: 'শুভ শারদীয়া! 🙏',
       suggestions: [
         'Howrah to Maidan distance',
         'Find bathrooms near me',
-        'Pandals near my GPS location',
+        'Distance: Bagbazar to College Square',
+        'Shortest route for our group plan',
       ],
     };
   }
@@ -508,45 +481,16 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // 8. Universal Helpful Response for ANY question
-  if (isBn) {
-    return {
-      type: 'general_info',
-      reply: `🙏 **শুভ শারদীয়া!**\n\nআপনার প্রশ্ন: **"${userQuery}"**\n\n` +
-        `• কলকাতার দুর্গাপূজা বিশ্বখ্যাত শৈল্পিক প্যান্ডেল, আলোকসজ্জা ও সাংস্কৃতিক ঐতিহ্যের উৎসব।\n` +
-        `• যেকোনো প্যান্ডেলের দূরত্ব, মেট্রো স্টেশন, শৌচাগার বা যাতায়াতের রুট জানতে নির্দিষ্টভাবে লিখুন।\n` +
-        `• গ্রুপের রুট ও ম্যাপ দেখতে উপরের **Plan** বা **Route** অপশন দেখুন।`,
-      gmapsUrl: null,
-      suggestions: [
-        'হাউড়া থেকে বাগবাজার দূরত্ব',
-        'কাছের বাথরুম কোথায়',
-        'আমার রুট গাইড বলো',
-      ],
-    };
-  }
-
-  if (isHi) {
-    return {
-      type: 'general_info',
-      reply: `🙏 **शुभ शारदीय नवरात्रि!**\n\nआपका प्रश्न: **"${userQuery}"**\n\n` +
-        `• कोलकाता की दुर्गा पूजा अद्भुत कलात्मक पंडालों और संस्कृति का भव्य उत्सव है।\n` +
-        `• किसी भी पंडाल, निकटतम मेट्रो स्टेशन या रास्ते के बारे में पूछें।\n` +
-        `• ग्रुप का नक्शा देखने के लिए ऊपर **Plan** या **Route** सेक्शन देखें।`,
-      gmapsUrl: null,
-      suggestions: [
-        'Howrah to Maidan distance',
-        'Find bathrooms near me',
-      ],
-    };
-  }
-
+  // 8. Universal Helpful Response for ANY question with direct Google Maps link
+  const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(userQuery + ' Kolkata')}`;
   return {
     type: 'general_info',
     reply: `🙏 **শুভ শারদীয়া!** Regarding **"${userQuery}"**:\n\n` +
       `• **Kolkata Puja Guide:** You can explore pandals, distances, travel times, and live transit anytime.\n` +
       `• **Metro Tip:** The Kolkata Metro (Blue & underwater Green Line) is the fastest way to travel during Durga Puja.\n` +
-      `• **Route & Plan:** Check your group route map in the tabs above for step-by-step nearest pandal itinerary.`,
-    gmapsUrl: null,
+      `• **Plan Section:** Check your group plan route map in the tabs above for step-by-step nearest pandal order.\n\n` +
+      `[🗺️ Open in Google Maps](${gmapsUrl})`,
+    gmapsUrl,
     suggestions: [
       'Find bathrooms near me',
       'Nearest bars and pubs',

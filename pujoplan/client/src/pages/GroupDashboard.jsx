@@ -13,7 +13,6 @@ import {
   finalizeGroupSpot, generateGroupRoute,
   removeMember, leaveGroup, regenerateInvite, deleteGroup,
   getGroupLocations, updateGroupLocation, deduplicateMembers,
-  saveLocalGroups, getLocalGroups,
 } from '../services/api';
 import { getReliableCurrentLocation } from '../services/routingService';
 import {
@@ -407,45 +406,33 @@ export default function GroupDashboard() {
     }
   }, [activeTab]);
 
-  const requestGpsLocation = useCallback((shouldFlyTo = false) => {
-    // 1. Request native Android location permission and prompt enable GPS if needed
-    if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.requestLocationPermission) {
-      window.AndroidBridge.requestLocationPermission();
-    }
-
-    if (!navigator?.geolocation) {
-      setToastMessage('GPS Geolocation is not supported on this device.');
-      return;
-    }
+  const requestGpsLocation = useCallback(() => {
+    if (!navigator?.geolocation) return;
 
     const onPos = (pos) => {
-      const loc = {
+      setMyLocation({
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy || 20,
-      };
-      setMyLocation(loc);
-      if (shouldFlyTo && mapComponentRef.current) {
-        mapComponentRef.current.recenterMe();
-      }
+        accuracy: pos.coords.accuracy || 30,
+      });
     };
 
     navigator.geolocation.getCurrentPosition(
       onPos,
-      (err) => {
-        console.warn('[GPS] Position failed:', err);
-        if (typeof window !== 'undefined' && window.AndroidBridge && window.AndroidBridge.promptEnableGps) {
-          window.AndroidBridge.promptEnableGps();
-        }
-        setToastMessage('⚠️ Location is off. Please enable GPS Location to see your live position.');
+      () => {
+        navigator.geolocation.getCurrentPosition(onPos, () => { }, {
+          enableHighAccuracy: false,
+          timeout: 12000,
+          maximumAge: 60000,
+        });
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
     );
   }, []);
 
   // Auto-read GPS when mounted or when Route tab opens
   useEffect(() => {
-    requestGpsLocation(false);
+    requestGpsLocation();
   }, [requestGpsLocation, activeTab]);
 
   // Passive watchPosition while Route tab is open — keeps the blue dot and red tracker live
@@ -547,8 +534,8 @@ export default function GroupDashboard() {
         if (isMeRemoved) {
           try {
             localStorage.removeItem(`pp_shared_group_${id}`);
-            const remaining = getLocalGroups().filter(g => g.id !== id);
-            saveLocalGroups(remaining);
+            const remaining = (JSON.parse(localStorage.getItem('pp_local_groups') || '[]')).filter(g => g.id !== id);
+            localStorage.setItem('pp_local_groups', JSON.stringify(remaining));
           } catch (_) { }
 
           navigate('/groups', { replace: true });
@@ -1048,8 +1035,13 @@ export default function GroupDashboard() {
       await deleteGroup(id);
       try {
         localStorage.removeItem(`pp_shared_group_${id}`);
-        const localGroups = getLocalGroups().filter(g => g.id !== id);
-        saveLocalGroups(localGroups);
+        const localGroups = (JSON.parse(localStorage.getItem('pp_local_groups') || '[]')).filter(g => g.id !== id);
+        localStorage.setItem('pp_local_groups', JSON.stringify(localGroups));
+        if (currentUserId) {
+          const uKey = `pp_local_groups_${currentUserId}`;
+          const uGroups = (JSON.parse(localStorage.getItem(uKey) || '[]')).filter(g => g.id !== id);
+          localStorage.setItem(uKey, JSON.stringify(uGroups));
+        }
       } catch (_) { }
 
       navigate('/groups', { replace: true });
@@ -1415,7 +1407,6 @@ export default function GroupDashboard() {
                 onToggleSharing={handleToggleSharing}
                 sharingLoading={sharingLoading}
                 onRecenterOnMe={() => {
-                  requestGpsLocation(true);
                   mapComponentRef.current?.recenterMe();
                 }}
                 onFitRoute={() => {

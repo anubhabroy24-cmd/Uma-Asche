@@ -147,7 +147,7 @@ function AppRoutes() {
     };
   }, [navigate]);
 
-  // Handle incoming call answer from native Android
+  // Handle incoming call answer from native Android notification action
   React.useEffect(() => {
     const handleNativeAnswer = (e) => {
       const detail = e.detail || {};
@@ -156,37 +156,8 @@ function AppRoutes() {
       }
     };
     window.addEventListener('native:answer_call', handleNativeAnswer);
-    return () => {
-      window.removeEventListener('native:answer_call', handleNativeAnswer);
-    };
+    return () => window.removeEventListener('native:answer_call', handleNativeAnswer);
   }, [navigate]);
-
-  // Continuously ensure native AndroidBridge has the logged-in user credentials for 24/7 background call listening
-  React.useEffect(() => {
-    const syncWithAndroid = () => {
-      try {
-        const storedRaw = localStorage.getItem('pp_user');
-        const token = localStorage.getItem('pp_token') || '';
-        if (storedRaw && typeof window !== 'undefined' && window.AndroidBridge?.saveUserSession) {
-          const userObj = JSON.parse(storedRaw);
-          const uid = userObj.id || userObj.userId || userObj.uid || userObj.firebaseUid;
-          if (uid) {
-            window.AndroidBridge.saveUserSession(
-              String(uid),
-              token,
-              userObj.name || '',
-              'https://uma-asche.onrender.com/api',
-              userObj.email || ''
-            );
-          }
-        }
-      } catch (_) {}
-    };
-
-    syncWithAndroid();
-    const interval = setInterval(syncWithAndroid, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   React.useEffect(() => {
     // 1. Initialize notification channel & request notification permission directly with system
