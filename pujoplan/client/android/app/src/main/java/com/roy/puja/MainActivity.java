@@ -5,8 +5,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -45,6 +49,9 @@ public class MainActivity extends BridgeActivity {
 
                 // Start the background call service immediately
                 startCallService();
+
+                // Request background battery optimization exemption so calls arrive when app is closed
+                runOnUiThread(MainActivity.this::requestBatteryOptimizationExemption);
             } catch (Exception e) {
                 Log.e(TAG, "Error saving user session: " + e.getMessage());
             }
@@ -90,6 +97,77 @@ public class MainActivity extends BridgeActivity {
         public void dismissCall() {
             Log.d(TAG, "AndroidBridge.dismissCall");
             CallNotificationHelper.dismissCall(mContext);
+        }
+
+        @JavascriptInterface
+        public boolean isGpsEnabled() {
+            try {
+                LocationManager lm = (LocationManager) mContext.getSystemService(Context.LOCATION_SERVICE);
+                return lm != null && (lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER));
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void requestLocationPermissionOrEnableGps() {
+            Log.d(TAG, "AndroidBridge.requestLocationPermissionOrEnableGps");
+            try {
+                runOnUiThread(() -> {
+                    // Check fine location permission first
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(MainActivity.this, new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        }, PERMISSION_REQ_CODE);
+                    } else {
+                        // Permission already granted, but GPS hardware switch may be OFF
+                        LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                        boolean isGps = lm != null && (lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER));
+                        if (!isGps) {
+                            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error requesting location / GPS: " + e.getMessage());
+            }
+        }
+
+        @JavascriptInterface
+        public boolean isBackgroundPermissionGranted() {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PowerManager pm = (PowerManager) mContext.getSystemService(Context.POWER_SERVICE);
+                    return pm != null && pm.isIgnoringBatteryOptimizations(mContext.getPackageName());
+                }
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void requestBackgroundPermission() {
+            Log.d(TAG, "AndroidBridge.requestBackgroundPermission");
+            runOnUiThread(MainActivity.this::requestBatteryOptimizationExemption);
+        }
+    }
+
+    public void requestBatteryOptimizationExemption() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error requesting battery optimization exemption: " + e.getMessage());
         }
     }
 
@@ -191,13 +269,27 @@ public class MainActivity extends BridgeActivity {
             needed.add(Manifest.permission.ACCESS_COARSE_LOCATION);
         }
 
-        // 3. Audio & Phone Calling (Microphone)
+        // 3. Audio & Phone Calling (Microphone & Phone state)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             needed.add(Manifest.permission.RECORD_AUDIO);
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.READ_PHONE_STATE);
         }
 
         if (!needed.isEmpty()) {
             ActivityCompat.requestPermissions(this, needed.toArray(new String[0]), PERMISSION_REQ_CODE);
+        } else {
+            // Check battery optimization exemption so app can run in background
+            requestBatteryOptimizationExemption();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_REQ_CODE) {
+            requestBatteryOptimizationExemption();
         }
     }
 

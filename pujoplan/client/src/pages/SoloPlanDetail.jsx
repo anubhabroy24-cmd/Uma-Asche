@@ -99,7 +99,19 @@ export default function SoloPlanDetail() {
 
   // ── Auto GPS when mounted or when Route tab opens ──
   const requestGpsLocation = useCallback(() => {
-    if (!navigator?.geolocation) return;
+    if (typeof window !== 'undefined' && window.AndroidBridge) {
+      if (typeof window.AndroidBridge.isGpsEnabled === 'function' && !window.AndroidBridge.isGpsEnabled()) {
+        window.AndroidBridge.requestLocationPermissionOrEnableGps();
+        setToastMessage('GPS is turned off. Please turn on Location in settings.');
+      } else if (typeof window.AndroidBridge.requestLocationPermissionOrEnableGps === 'function') {
+        window.AndroidBridge.requestLocationPermissionOrEnableGps();
+      }
+    }
+
+    if (!navigator?.geolocation) {
+      setToastMessage('Geolocation is not supported by your device.');
+      return;
+    }
 
     const onPos = (pos) => {
       setMyLocation({
@@ -111,14 +123,14 @@ export default function SoloPlanDetail() {
 
     navigator.geolocation.getCurrentPosition(
       onPos,
-      () => {
-        navigator.geolocation.getCurrentPosition(onPos, () => {}, {
-          enableHighAccuracy: false,
-          timeout: 12000,
-          maximumAge: 60000,
-        });
+      (err) => {
+        console.warn('Solo GPS location fetch error:', err);
+        if (typeof window !== 'undefined' && window.AndroidBridge?.requestLocationPermissionOrEnableGps) {
+          window.AndroidBridge.requestLocationPermissionOrEnableGps();
+        }
+        setToastMessage('Location is turned off or denied. Please turn on GPS.');
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, []);
 

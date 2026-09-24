@@ -130,7 +130,7 @@ public class CallNotificationHelper {
 
     public static synchronized void dismissCall(Context context) {
         Log.d(TAG, "dismissCall");
-        stopRingtone();
+        stopRingtone(context);
         releaseWakeLock();
 
         try {
@@ -151,22 +151,28 @@ public class CallNotificationHelper {
                 sMediaPlayer = null;
             }
 
+            AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                audioManager.setMode(AudioManager.MODE_RINGTONE);
+            }
+
             sMediaPlayer = MediaPlayer.create(context, R.raw.pather_panchali);
             if (sMediaPlayer != null) {
                 sMediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setLegacyStreamType(AudioManager.STREAM_RING)
                         .build());
                 sMediaPlayer.setLooping(true);
                 sMediaPlayer.start();
-                Log.d(TAG, "Pather Panchali ringtone started successfully.");
+                Log.d(TAG, "Pather Panchali ringtone started successfully on STREAM_RING.");
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to start ringtone: " + e.getMessage());
         }
     }
 
-    public static synchronized void stopRingtone() {
+    public static synchronized void stopRingtone(Context context) {
         try {
             if (sMediaPlayer != null) {
                 if (sMediaPlayer.isPlaying()) {
@@ -176,9 +182,20 @@ public class CallNotificationHelper {
                 sMediaPlayer = null;
                 Log.d(TAG, "Ringtone stopped.");
             }
+
+            if (context != null) {
+                AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+                if (audioManager != null) {
+                    audioManager.setMode(AudioManager.MODE_NORMAL);
+                }
+            }
         } catch (Exception e) {
             Log.e(TAG, "Failed to stop ringtone: " + e.getMessage());
         }
+    }
+
+    public static synchronized void stopRingtone() {
+        stopRingtone(null);
     }
 
     private static void acquireWakeLock(Context context) {

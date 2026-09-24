@@ -565,24 +565,50 @@ const PujaMap = forwardRef(function PujaMap({
 
   // Recenter on My Location
   const handleRecenterMe = () => {
+    // 1. If running in native Android app, check if GPS toggle is on / prompt permission
+    if (typeof window !== 'undefined' && window.AndroidBridge) {
+      if (typeof window.AndroidBridge.isGpsEnabled === 'function' && !window.AndroidBridge.isGpsEnabled()) {
+        window.AndroidBridge.requestLocationPermissionOrEnableGps();
+        if (typeof onError === 'function') {
+          onError('Device GPS is turned off. Please turn on Location in settings.');
+        }
+        return;
+      }
+      if (typeof window.AndroidBridge.requestLocationPermissionOrEnableGps === 'function') {
+        window.AndroidBridge.requestLocationPermissionOrEnableGps();
+      }
+    }
+
+    // 2. If we already have accurate GPS coordinates, fly directly to them
     if (effectiveLocation?.latitude && effectiveLocation?.longitude && mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([effectiveLocation.latitude, effectiveLocation.longitude], 16, { duration: 0.8 });
-    } else if (navigator?.geolocation) {
+      mapInstanceRef.current.flyTo([effectiveLocation.latitude, effectiveLocation.longitude], 17, { duration: 0.8 });
+    }
+
+    // 3. Query high-accuracy GPS position
+    if (navigator?.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy || 30 };
+          const loc = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy || 30,
+          };
           setInternalLoc(loc);
-          mapInstanceRef.current?.flyTo([loc.latitude, loc.longitude], 16, { duration: 0.8 });
+          mapInstanceRef.current?.flyTo([loc.latitude, loc.longitude], 17, { duration: 0.8 });
         },
-        () => {
-          if (waypoints.length > 0 && mapInstanceRef.current) {
-            mapInstanceRef.current.flyTo([waypoints[0].lat, waypoints[0].lng], 15, { duration: 0.8 });
+        (err) => {
+          console.warn('Recenter location error:', err);
+          if (typeof window !== 'undefined' && window.AndroidBridge?.requestLocationPermissionOrEnableGps) {
+            window.AndroidBridge.requestLocationPermissionOrEnableGps();
+          }
+          if (typeof onError === 'function') {
+            onError('Could not get live location. Please allow location permission and turn on GPS.');
           }
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
-    } else if (waypoints.length > 0 && mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([waypoints[0].lat, waypoints[0].lng], 15, { duration: 0.8 });
+    } else if (typeof onError === 'function') {
+      onError('Geolocation is not supported by your browser.');
     }
   };
 

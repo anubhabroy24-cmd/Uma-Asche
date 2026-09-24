@@ -183,23 +183,41 @@ public class BackgroundCallService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
-        Log.d(TAG, "App task removed (swiped away). Rescheduling BackgroundCallService...");
-        // Re-arm service via AlarmManager so Android restarts it when swiped away
+        Log.d(TAG, "App task removed (swiped away). Keeping BackgroundCallService alive...");
         try {
             Intent restartServiceIntent = new Intent(getApplicationContext(), BackgroundCallService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                androidx.core.content.ContextCompat.startForegroundService(getApplicationContext(), restartServiceIntent);
+            } else {
+                startService(restartServiceIntent);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Direct service start on task remove: " + e.getMessage());
+        }
+
+        try {
+            Intent alarmIntent = new Intent(getApplicationContext(), BackgroundCallService.class);
             PendingIntent restartPendingIntent = PendingIntent.getService(
                     getApplicationContext(),
                     1,
-                    restartServiceIntent,
-                    PendingIntent.FLAG_ONE_SHOT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
+                    alarmIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0)
             );
             AlarmManager alarmService = (AlarmManager) getApplicationContext().getSystemService(Context.ALARM_SERVICE);
             if (alarmService != null) {
-                alarmService.set(
-                        AlarmManager.ELAPSED_REALTIME,
-                        SystemClock.elapsedRealtime() + 1000,
-                        restartPendingIntent
-                );
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmService.setExactAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            SystemClock.elapsedRealtime() + 1500,
+                            restartPendingIntent
+                    );
+                } else {
+                    alarmService.set(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                            SystemClock.elapsedRealtime() + 1500,
+                            restartPendingIntent
+                    );
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Failed to reschedule service on task remove: " + e.getMessage());
