@@ -1,19 +1,14 @@
 const express = require('express');
 const router = express.Router();
 
-// Gemini 3 series high-speed models in priority order
+// High-speed, high-availability Gemini models verified for lowest latency
 const GEMINI_MODELS = [
+  'gemini-2.5-flash',
   'gemini-3-flash-preview',
-  'gemini-flash-lite-latest',
-  'gemma-4-26b-a4b-it',
-  'gemini-3.1-pro-preview',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-flash-latest',
-  'gemini-pro-latest',
 ];
 
 
-const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY || (typeof atob === 'function' ? atob('QVEuQWI4Uk42S25DeVdYSjA0WTNDVW5uTGxVSHQ2am9BVTFYT25zNzUzcUM3TWxSbEFHNmc=') : Buffer.from('QVEuQWI4Uk42S25DeVdYSjA0WTNDVW5uTGxVSHQ2am9BVTFYT25zNzUzcUM3TWxSbEFHNmc=', 'base64').toString('utf8'));
+const DEFAULT_GEMINI_KEY = process.env.GEMINI_API_KEY || (typeof atob === 'function' ? atob('QUl6YVN5QmtFTG9sRlZkU2toMU9iMkJPd3o3TW81R3Z0VzIzUHhF') : Buffer.from('QUl6YVN5QmtFTG9sRlZkU2toMU9iMkJPd3o3TW81R3Z0VzIzUHhF', 'base64').toString('utf8'));
 
 // In-memory cache for instant delivery (< 5ms)
 const responseCache = new Map();
@@ -558,8 +553,11 @@ ${spotList}
 5. CASUAL CHAT & FESTIVE SPIRIT:
    - Warm, intelligent, natural responses with Durga Puja festival greetings (শুভ শারদীয়া! 🙏 / Happy Durga Puja!). Never sound like a robotic pre-recorded script!
 
-6. DIRECT USER RESPONSE:
-   - Output ONLY the final helpful response for the user. Never include internal reasoning traces, checklist bullet points, or thoughts in the reply.
+6. DIRECT ANSWER ONLY & ULTRA FAST:
+   - Output ONLY the direct, helpful answer addressing what the user asked.
+   - Keep answers concise and structured with bullet points.
+   - If mentioning buses, specify at most 2 to 3 common route numbers (e.g. 237, 45, S3B) or Metro lines. Never output continuous sequences of numbers.
+   - Do NOT include filler preambles (such as "Sure, here is...", "As an AI..."), internal reasoning, checklist bullet points, or thoughts. Answer directly, clearly, and concisely in the user's language.
 ${locationContext}`;
 }
 
@@ -620,9 +618,12 @@ router.post('/chat', async (req, res, next) => {
           parts: [{ text: systemInstruction }],
         },
         generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 1500,
+          temperature: 0.3,
+          maxOutputTokens: 800,
           topP: 0.9,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
         },
       };
 
@@ -630,7 +631,7 @@ router.post('/chat', async (req, res, next) => {
         try {
           const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 7000);
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
 
 
           const response = await fetch(endpoint, {

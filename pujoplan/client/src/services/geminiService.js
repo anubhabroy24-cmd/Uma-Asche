@@ -5,17 +5,12 @@
 import api from './api';
 
 const GEMINI_MODELS = [
+  'gemini-2.5-flash',
   'gemini-3-flash-preview',
-  'gemini-flash-lite-latest',
-  'gemma-4-26b-a4b-it',
-  'gemini-3.1-pro-preview',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-flash-latest',
-  'gemini-pro-latest',
 ];
 
 
-const DEFAULT_CLIENT_KEY = (typeof atob === 'function' ? atob('QVEuQWI4Uk42S25DeVdYSjA0WTNDVW5uTGxVSHQ2am9BVTFYT25zNzUzcUM3TWxSbEFHNmc=') : '');
+const DEFAULT_CLIENT_KEY = (typeof atob === 'function' ? atob('QUl6YVN5QmtFTG9sRlZkU2toMU9iMkJPd3o3TW81R3Z0VzIzUHhF') : '');
 
 /**
  * Retrieve active Gemini API key if present in client environment
@@ -97,11 +92,14 @@ ${spotNames}
      c) Point-to-point transit directions between two specified locations (e.g. Howrah to Bagbazar).
    - If providing a link, format it as: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<query>+Kolkata)
 
-5. NATURAL & FESTIVE RESPONSES:
-   - Always sound like an authentic, helpful AI assistant. Never output robotic pre-written templates!
+5. CASUAL CHAT & FESTIVE SPIRIT:
+   - Warm, intelligent, natural responses with Durga Puja festival greetings (শুভ শারদীয়া! 🙏 / Happy Durga Puja!). Never sound like a robotic pre-recorded script!
 
-6. DIRECT USER RESPONSE:
-   - Output ONLY the final helpful response for the user. Never include internal reasoning traces, checklist bullet points, or thoughts in the reply.
+6. DIRECT ANSWER ONLY & ULTRA FAST:
+   - Output ONLY the direct, helpful answer addressing what the user asked.
+   - Keep answers concise and structured with bullet points.
+   - If mentioning buses, specify at most 2 to 3 common route numbers (e.g. 237, 45, S3B) or Metro lines. Never output continuous sequences of numbers.
+   - Do NOT include filler preambles (such as "Sure, here is...", "As an AI..."), internal reasoning, checklist bullet points, or thoughts. Answer directly, clearly, and concisely in the user's language.
 ${locationContext}`;
 }
 
@@ -158,9 +156,12 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
     },
     contents,
     generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 1000,
+      temperature: 0.3,
+      maxOutputTokens: 800,
       topP: 0.9,
+      thinkingConfig: {
+        thinkingBudget: 0,
+      },
     },
   };
 
