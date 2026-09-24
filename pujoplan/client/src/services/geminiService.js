@@ -57,6 +57,14 @@ function buildSystemInstruction(context = {}) {
 
   return `You are Uma Asche AI — the intelligent, friendly, and comprehensive Kolkata Durga Puja & General Assistant.
 
+LANGUAGE INSTRUCTION (CRITICAL - HIGHEST PRIORITY):
+- You MUST answer in the EXACT SAME LANGUAGE as the user's input!
+- If the user writes in Bengali (বাংলা, e.g. "কেমন আছো", "রুট বলো", "প্যান্ডেলে যাবো"), answer fluently and naturally in Bengali!
+- If the user writes in Hindi (हिंदी, e.g. "नमस्ते", "रास्ता बताओ", "पंडাল"), answer in Hindi!
+- If the user writes in Banglish / Hinglish (e.g. "kemon acho", "route bolo", "ki korbo"), answer in the same friendly conversational Bengali/Hindi style!
+- If the user writes in English, answer in English!
+- Accept and reply accurately in ALL languages. Never reject questions based on language.
+
 CORE GUIDELINES:
 1. USER'S ACTUAL PLAN & ROUTE DETAILS:
    - Plan Name: "${groupName || 'Durga Puja Parikrama'}"
@@ -77,8 +85,8 @@ ${spotNames}
    - ONLY when the user explicitly asks for amenities or locations (e.g. "bars near me", "toilet near me", "restaurants/biryani near me", "atms near me", "hospitals near me"):
      Recommend top local Kolkata places and provide ONE Google Maps search link at the end: [🗺️ Open in Google Maps](https://www.google.com/maps/search/<QUERY>+near+<LOCATION>+Kolkata).
 
-4. GENERAL CONVERSATION:
-   - For general questions not asking for a place or directions, give a clear, direct answer WITHOUT any Google Maps links.
+4. GENERAL CONVERSATION & KNOWLEDGE:
+   - Answer ANY question the user asks helpfully, thoroughly, and warmly in the user's language without Google Maps links unless requested.
 ${locationContext}`;
 }
 
@@ -86,20 +94,29 @@ ${locationContext}`;
  * Send query to backend /api/ai/chat with fallback to direct Gemini REST
  */
 export async function sendGeminiMessage(userQuery, conversationHistory = [], context = {}) {
+  const activeKey = getGeminiApiKey();
+
   // 1. First priority: Connect with backend and pass questions through it
   try {
-    const res = await api.post('/ai/chat', {
-      message: userQuery,
-      conversationHistory,
-      context,
-    });
+    const res = await api.post(
+      '/ai/chat',
+      {
+        message: userQuery,
+        conversationHistory,
+        context,
+      },
+      {
+        headers: activeKey ? { 'x-gemini-key': activeKey } : {},
+      }
+    );
 
     if (res.data && res.data.reply) {
       return {
         reply: res.data.reply,
         gmapsUrl: res.data.gmapsUrl,
-        modelUsed: res.data.modelUsed || 'gemini-3.6-flash',
-        source: 'gemini',
+        modelUsed: res.data.modelUsed || 'gemini-2.5-flash',
+        source: res.data.source || 'gemini',
+        apiKeyInvalid: !!res.data.apiKeyInvalid,
       };
     }
   } catch (backendErr) {
@@ -107,7 +124,7 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
   }
 
   // 2. Direct fallback (for offline preview / netlify static without proxy)
-  const apiKey = getGeminiApiKey();
+  const apiKey = activeKey;
   if (!apiKey) {
     throw new Error('NO_API_KEY');
   }
@@ -132,7 +149,7 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
     contents,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 1000,
+      maxOutputTokens: 1200,
       topP: 0.9,
     },
   };
@@ -141,10 +158,13 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
 
   for (const model of GEMINI_MODELS) {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: JSON.stringify(payload),
       });
 
