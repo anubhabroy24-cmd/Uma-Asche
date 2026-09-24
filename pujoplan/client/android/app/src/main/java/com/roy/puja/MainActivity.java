@@ -156,8 +156,17 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private static boolean sHasCheckedPermissions = false;
+
     public void requestBatteryOptimizationExemption() {
         try {
+            SharedPreferences prefs = getSharedPreferences("pujoplan_prefs", Context.MODE_PRIVATE);
+            // Non-mandatory: ask at most once. If user denies, it's completely ok! Never loop or re-ask.
+            if (prefs.getBoolean("has_prompted_battery_opt", false)) {
+                return;
+            }
+            prefs.edit().putBoolean("has_prompted_battery_opt", true).apply();
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
                 if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
@@ -170,6 +179,7 @@ public class MainActivity extends BridgeActivity {
             Log.e(TAG, "Error requesting battery optimization exemption: " + e.getMessage());
         }
     }
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -250,6 +260,9 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void checkAndRequestAppPermissions() {
+        if (sHasCheckedPermissions) return;
+        sHasCheckedPermissions = true;
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
 
         List<String> needed = new ArrayList<>();
@@ -279,18 +292,13 @@ public class MainActivity extends BridgeActivity {
 
         if (!needed.isEmpty()) {
             ActivityCompat.requestPermissions(this, needed.toArray(new String[0]), PERMISSION_REQ_CODE);
-        } else {
-            // Check battery optimization exemption so app can run in background
-            requestBatteryOptimizationExemption();
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_REQ_CODE) {
-            requestBatteryOptimizationExemption();
-        }
+        // Do not force or loop battery optimization or permissions on denial. If user denies, it's completely ok!
     }
 
     @Override
@@ -313,11 +321,11 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception ignored) {}
 
-        // If user came back to the app and permissions are still not granted, ask again!
-        checkAndRequestAppPermissions();
+        // Non-mandatory: Do not loop permissions onResume! Open app smoothly.
 
         // Check if there is an active session in prefs to ensure background service is running
         try {
+
             SharedPreferences prefs = getSharedPreferences("pujoplan_prefs", Context.MODE_PRIVATE);
             String userId = prefs.getString("user_id", "");
             if (userId != null && !userId.trim().isEmpty()) {

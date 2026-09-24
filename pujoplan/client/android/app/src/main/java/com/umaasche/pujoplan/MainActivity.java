@@ -95,8 +95,5 @@ public class MainActivity extends BridgeActivity {
                 this.bridge.getWebView().resumeTimers();
             }
         } catch (Exception ignored) {}
-
-        // If user came back to the app and permissions are still not granted, ask again!
-        checkAndRequestAppPermissions();
     }
 }
