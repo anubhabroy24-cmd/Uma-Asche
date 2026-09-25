@@ -239,7 +239,12 @@ export default function DistanceChatbot({
     } catch (err) {
       console.warn('AI call error, using local fallback:', err);
       try {
-        const responseData = await processDistanceQuery(text, activeLoc);
+        const responseData = await processDistanceQuery(text, activeLoc, {
+          groupName,
+          startLocation,
+          groupSpots,
+          waypoints,
+        });
         const botMsg = {
           id: 'bot-' + Date.now(),
           sender: 'bot',

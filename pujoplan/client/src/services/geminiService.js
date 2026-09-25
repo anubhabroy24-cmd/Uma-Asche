@@ -116,7 +116,8 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
       conversationHistory,
       context,
     }, {
-      headers: clientKey ? { 'x-gemini-key': clientKey } : {}
+      headers: clientKey ? { 'x-gemini-key': clientKey } : {},
+      timeout: 25000,
     });
 
     if (res.data && res.data.reply) {
@@ -145,7 +146,9 @@ export async function sendGeminiMessage(userQuery, conversationHistory = [], con
     if (msg.sender === 'user' && msg.text) {
       contents.push({ role: 'user', parts: [{ text: msg.text }] });
     } else if (msg.sender === 'bot' && (msg.reply || msg.text)) {
-      contents.push({ role: 'model', parts: [{ text: msg.reply || msg.text }] });
+      if (contents.length > 0) {
+        contents.push({ role: 'model', parts: [{ text: msg.reply || msg.text }] });
+      }
     }
   }
   contents.push({ role: 'user', parts: [{ text: userQuery }] });

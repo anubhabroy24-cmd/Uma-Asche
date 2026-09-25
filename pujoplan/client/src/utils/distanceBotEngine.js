@@ -188,8 +188,9 @@ export function findNearbyPandals(targetLat, targetLng, maxCount = 5, maxRadiusK
 }
 
 // Master NLP query processor
-export async function processDistanceQuery(userQuery, userLocation = null) {
+export async function processDistanceQuery(userQuery, userLocation = null, context = {}) {
   const text = normalize(userQuery);
+  const qLower = userQuery.toLowerCase();
 
   // 1. Math / Syllabus / Academic Filter (Strictly reject non-puja questions)
   if (isMathOrSyllabus(userQuery)) {
@@ -208,7 +209,181 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // 2. Bathroom / Washroom / Toilet Search with direct Google Maps Link
+  // 2. Specific Iconic Kolkata Eateries & Landmarks (e.g. Aminia, Arsalan, Peter Cat)
+  if (/aminia/i.test(qLower)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Aminia+Restaurant+Esplanade+Kolkata';
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `📍 **আমিনিয়া রেস্তোরাঁ (এসপ্ল্যানেড) / Aminia Restaurant (Esplanade):**\n\n` +
+        `• **ঠিকানা (Address):** 6A, S.N. Banerjee Road, New Market Area, Esplanade, Kolkata - 700087 (ফুটনানি চেম্বার্স ও মেট্রো সিনেমার উল্টোদিকে, কে.সি. দাশ-এর কাছে)।\n` +
+        `• **🚇 নিকটতম মেট্রো:** এসপ্ল্যানেড মেট্রো স্টেশন (গেট নং ৪ বা ৫ থেকে মাত্র ২ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় পদ (Specialties):** বিখ্যাত কলকাতা মটন বিরিয়ানি (নরম আলু ও ডিম সহ), চিকেন চাপ, আওয়াধি বিরিয়ানি ও ফিরনি।\n\n` +
+        `[🗺️ গুগল ম্যাপে আমিনিয়া রেস্তোরাঁ খুলুন](${gmapsUrl})`,
+      suggestions: [
+        'Transport details for my this route',
+        'Find bathrooms near Esplanade',
+        'Pandals near Esplanade',
+      ],
+    };
+  }
+
+  if (/arsalan/i.test(qLower)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Arsalan+Restaurant+Park+Circus+Kolkata';
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `📍 **আরসালান রেস্তোরাঁ (পার্ক সার্কাস) / Arsalan (Park Circus):**\n\n` +
+        `• **ঠিকানা:** 191, Marina Garden Court, Park Circus 7-Point Crossing, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** পার্ক স্ট্রিট বা রবীন্দ্র সদন (সেখান থেকে অটো বা ট্যাক্সি)।\n` +
+        `• **জনপ্রিয় পদ:** কলকাতা স্পেশাল মাটন বিরিয়ানি, চিকেন চাপ ও আরসালান কাবাব।\n\n` +
+        `[🗺️ গুগল ম্যাপে আরসালান রেস্তোরাঁ খুলুন](${gmapsUrl})`,
+      suggestions: ['Food near Park Street', 'Find bathrooms near Park Circus'],
+    };
+  }
+
+  if (/peter\s*cat/i.test(qLower)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Peter+Cat+Park+Street+Kolkata';
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `📍 **পিটার ক্যাট (পার্ক স্ট্রিট) / Peter Cat (Park Street):**\n\n` +
+        `• **ঠিকানা:** 18A, Park Street, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** পার্ক স্ট্রিট মেট্রো স্টেশন (মাত্র ৩ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় পদ:** বিশ্ববিখ্যাত চেলো কাবাব (Chelo Kebab) ও ঐতিহ্যবাহী কন্টিনেন্টাল খাবার।\n\n` +
+        `[🗺️ গুগল ম্যাপে পিটার ক্যাট খুলুন](${gmapsUrl})`,
+      suggestions: ['Bars near Park Street', 'Food near Park Street'],
+    };
+  }
+
+  if (/mocambo/i.test(qLower)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Mocambo+Park+Street+Kolkata';
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `📍 **মোকাম্বো (পার্ক স্ট্রিট) / Mocambo (Park Street):**\n\n` +
+        `• **ঠিকানা:** 25B, Park Street, Kolkata (পিটার ক্যাটের কাছেই)।\n` +
+        `• **🚇 নিকটতম মেট্রো:** পার্ক স্ট্রিট মেট্রো স্টেশন (৩ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় পদ:** ডেভিলড ক্র্যাব (Devilled Crab), চিকেন টেট্রাজিনি ও কন্টিনেন্টাল সিজলার।\n\n` +
+        `[🗺️ গুগল ম্যাপে মোকাম্বো খুলুন](${gmapsUrl})`,
+      suggestions: ['Bars near Park Street', 'Food near Park Street'],
+    };
+  }
+
+  if (/nizam/i.test(qLower)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Nizams+Restaurant+New+Market+Kolkata';
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `📍 **নিজামস (নিউ মার্কেট) / Nizam's (New Market):**\n\n` +
+        `• **ঠিকানা:** 23/24, Hogg Street, New Market Area, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** এসপ্ল্যানেড মেট্রো স্টেশন (গেট নং ৫ থেকে ৪ মিনিট হাঁটা)।\n` +
+        `• **ঐতিহ্য:** কলকাতার আসল কাঠি রোলের জন্মস্থান (Original Kathi Roll, Mutton & Beef Roll)।\n\n` +
+        `[🗺️ গুগল ম্যাপে নিজামস খুলুন](${gmapsUrl})`,
+      suggestions: ['Food near Esplanade', 'Find bathrooms near Esplanade'],
+    };
+  }
+
+  if (/dacres\s*lane|chitto\s*da/i.test(qLower)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Dacres+Lane+Chitto+Babu+Dokan+Kolkata';
+    return {
+      type: 'amenity_card',
+      amenityType: 'food',
+      gmapsUrl,
+      reply: `📍 **ডেকার্স লেন / চিত্ত বাবুর দোকান (Dacres Lane - Chitto Da's):**\n\n` +
+        `• **ঠিকানা:** James Hickey Sarani (Dacres Lane), Esplanade, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** এসপ্ল্যানেড বা চাঁদনী চক মেট্রো স্টেশন (৩ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় খাবার:** চিত্তদার চিকেন স্টু ও টোস্ট, ফিশ ফ্রাই, খিচুড়ি ও কফি।\n\n` +
+        `[🗺️ গুগল ম্যাপে ডেকার্স লেন খুলুন](${gmapsUrl})`,
+      suggestions: ['Food near Esplanade', 'Find bathrooms near Esplanade'],
+    };
+  }
+
+  // 3. Step-by-Step Route & Transport Itinerary for the user's plan
+  const isRouteTransport = /\b(transport|route|routes|transit|how to visit|how to reach|how to go|travel details|step by step|steps|itinerary)\b/i.test(text) ||
+    /(ট্রান্সপোর্ট|যাতায়াত|পরিবহন|রুট|কীভাবে যাব|কিভাবে যাব|পরিক্রমা|রাস্তা)/i.test(userQuery);
+
+  if (isRouteTransport) {
+    const rawSpots = Array.isArray(context.groupSpots) && context.groupSpots.length > 0
+      ? context.groupSpots
+      : Array.isArray(context.waypoints) && context.waypoints.length > 0
+        ? context.waypoints.filter(w => w && w.id !== 'start-0' && w.id !== 'start-me')
+        : [];
+
+    const startLoc = context.startLocation || (context.waypoints?.[0]?.name?.replace(/\s*\(Start\)$/i, '')) || 'Kolkata Central';
+
+    if (rawSpots.length > 0) {
+      const stepLines = [];
+      for (let i = 0; i < rawSpots.length; i++) {
+        const s = rawSpots[i];
+        const pName = s.name || s.spot?.name || `Pandal ${i + 1}`;
+        const pArea = s.area || s.spot?.area || 'Kolkata';
+        const pMetro = s.nearestMetro || s.spot?.nearestMetro || 'নিকটতম মেট্রো স্টেশন';
+
+        if (i === 0) {
+          stepLines.push(
+            `**📍 ধাপ ১: ${startLoc} ➔ ${pName} (${pArea})**\n` +
+            `• **মেট্রো যাত্রা:** ${startLoc} থেকে কলকাতা মেট্রো ধরে সোজা **${pMetro}** স্টেশনে নামুন।\n` +
+            `• **প্যান্ডেলে প্রবেশ:** স্টেশন গেট থেকে বের হয়ে পায়ে হেঁটে ৩-৫ মিনিট অথবা লোকাল রিকশায় সরাসরি প্যান্ডেলে পৌঁছান।`
+          );
+        } else {
+          const prev = rawSpots[i - 1];
+          const prevName = prev.name || prev.spot?.name || `Pandal ${i}`;
+          const isSameArea = prev.area && s.area && prev.area.toLowerCase() === s.area.toLowerCase();
+          const transitMethod = isSameArea
+            ? `• **কানেক্টিং রুট:** একই এলাকায় অবস্থিত হওয়ায় **${prevName}** থেকে ৫-৮ মিনিট হেঁটে বা রিকশায় সরাসরি **${pName}** প্যান্ডেলে পৌঁছান।`
+            : `• **মেট্রো/অটো রুট:** **${prev.nearestMetro || 'নিকটতম মেট্রো'}** থেকে মেট্রো নিয়ে **${pMetro}** স্টেশনে আসুন।`;
+          stepLines.push(
+            `**📍 ধাপ ${i + 1}: ${prevName} ➔ ${pName} (${pArea})**\n` +
+            `${transitMethod}\n` +
+            `• **নিকটতম মেট্রো:** **${pMetro}**`
+          );
+        }
+      }
+
+      const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(startLoc + ' Kolkata')}&destination=${encodeURIComponent((rawSpots[rawSpots.length - 1]?.name || 'Kolkata') + ' Kolkata')}`;
+
+      return {
+        type: 'route_plan',
+        reply: `🗺️ **আপনার পুজোর প্ল্যানের নিখুঁত যাতায়াত ও পরিবহন গাইড (ধাপে ধাপে):**\n\n` +
+          `• **শুরুর স্থান (Starting Point):** ${startLoc}\n` +
+          `• **মোট প্যান্ডেল সংখ্যা:** ${rawSpots.length} টি স্টপ\n\n` +
+          `${stepLines.join('\n\n')}\n\n` +
+          `**🚇 পুজো স্পেশাল মেট্রো ও ট্রাফিক টিপস:**\n` +
+          `• **সারারাত মেট্রো:** সপ্তমী, অষ্টমী ও নবমীর রাতে কলকাতা মেট্রো ভোর ৪টে পর্যন্ত বিশেষ বর্ধিত পরিষেবা দেয়।\n` +
+          `• **যানবাহন নিয়ন্ত্রণ:** বিকেল ৩:৩০ এর পর প্যান্ডেল সংলগ্ন রাস্তায় যান চলাচল বন্ধ হয়ে যায়; তাই মেট্রো এবং পায়ে হাঁটাই সবচেয়ে দ্রুততম মাধ্যম।\n` +
+          `• **জরুরি সহায়তা:** কলকাতা পুলিশ হেল্পলাইন ১১২ / ১০০।\n\n` +
+          `[🗺️ গুগল ম্যাপে পুরো রুটটি খুলুন](${gmapsUrl})`,
+        gmapsUrl,
+        suggestions: [
+          'Toilets near me',
+          'Bars near me',
+          'Famous restaurants near me',
+        ],
+      };
+    } else {
+      return {
+        type: 'route_plan',
+        reply: `🧭 **আপনার প্ল্যানে এখনও কোনো প্যান্ডেল যুক্ত করা হয়নি!**\n\n` +
+          `• উপরে **Plan** ট্যাবে গিয়ে আপনার পছন্দের প্যান্ডেলগুলি যুক্ত করুন।\n` +
+          `• আপনার বর্তমান শুরুর স্থান: **${startLoc}**।\n` +
+          `• প্যান্ডেল যুক্ত করার পর আবার আমাকে জিজ্ঞেস করলেই আমি প্রতিটি প্যান্ডেলের ধাপে ধাপে মেট্রো, হাঁটা ও অটো রুট এবং গুগল ম্যাপের ডিরেকশন দিয়ে দেব!`,
+        gmapsUrl: null,
+        suggestions: [
+          'Famous pandals in Kolkata',
+          'Find bathrooms near me',
+          'Bars near me',
+        ],
+      };
+    }
+  }
+
+  // 4. Bathroom / Washroom / Toilet Search with direct Google Maps Link
   if (isBathroomQuery(userQuery)) {
     const entities = extractEntities(userQuery);
     let targetName = 'Your Location';
@@ -240,16 +415,15 @@ export async function processDistanceQuery(userQuery, userLocation = null) {
     };
   }
 
-  // 3. Greetings & General Inquiries
+  // 5. Greetings & General Inquiries
   if (/^(hi|hello|hey|namaste|shubho|nomoshkar|help|who are you|kemon acho)/.test(text)) {
     return {
       type: 'greeting',
       reply: 'শুভ শারদীয়া! 🙏',
       suggestions: [
+        'Transport details for my this route',
         'Howrah to Maidan distance',
         'Find bathrooms near me',
-        'Distance: Bagbazar to College Square',
-        'Shortest route for our group plan',
       ],
     };
   }

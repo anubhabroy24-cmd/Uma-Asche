@@ -424,7 +424,80 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
     };
   }
 
-  // 6. Food, Restaurants, Biryani, Sweets (amenity request -> give Google Maps)
+  // 5.5 Specific Iconic Kolkata Eateries & Landmarks (e.g. Aminia, Arsalan, Peter Cat)
+  if (/aminia/i.test(q)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Aminia+Restaurant+Esplanade+Kolkata';
+    return {
+      reply: `📍 **আমিনিয়া রেস্তোরাঁ (এসপ্ল্যানেড) / Aminia Restaurant (Esplanade):**\n\n` +
+        `• **ঠিকানা (Address):** 6A, S.N. Banerjee Road, New Market Area, Esplanade, Kolkata - 700087 (ফুটনানি চেম্বার্স ও মেট্রো সিনেমার উল্টোদিকে, কে.সি. দাশ-এর কাছে)।\n` +
+        `• **🚇 নিকটতম মেট্রো:** এসপ্ল্যানেড মেট্রো স্টেশন (গেট নং ৪ বা ৫ থেকে মাত্র ২ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় পদ (Specialties):** ঐতিহ্যবাহী কলকাতা মটন বিরিয়ানি (নরম আলু ও ডিম সহ), চিকেন চাপ, আওয়াধি বিরিয়ানি ও ফিরনি।\n\n` +
+        `[🗺️ গুগল ম্যাপে আমিনিয়া রেস্তোরাঁ খুলুন](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  if (/arsalan/i.test(q)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Arsalan+Restaurant+Park+Circus+Kolkata';
+    return {
+      reply: `📍 **আরসালান রেস্তোরাঁ (পার্ক সার্কাস) / Arsalan (Park Circus):**\n\n` +
+        `• **ঠিকানা:** 191, Marina Garden Court, Park Circus 7-Point Crossing, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** পার্ক স্ট্রিট বা রবীন্দ্র সদন (সেখান থেকে অটো বা ট্যাক্সি)।\n` +
+        `• **জনপ্রিয় পদ:** কলকাতা স্পেশাল মাটন বিরিয়ানি, চিকেন চাপ ও আরসালান কাবাব।\n\n` +
+        `[🗺️ গুগল ম্যাপে আরসালান রেস্তোরাঁ খুলুন](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  if (/peter\s*cat/i.test(q)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Peter+Cat+Park+Street+Kolkata';
+    return {
+      reply: `📍 **পিটার ক্যাট (পার্ক স্ট্রিট) / Peter Cat (Park Street):**\n\n` +
+        `• **ঠিকানা:** 18A, Park Street, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** পার্ক স্ট্রিট মেট্রো স্টেশন (মাত্র ৩ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় পদ:** বিশ্ববিখ্যাত চেলো কাবাব (Chelo Kebab) ও ঐতিহ্যবাহী কন্টিনেন্টাল খাবার।\n\n` +
+        `[🗺️ গুগল ম্যাপে পিটার ক্যাট খুলুন](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  if (/mocambo/i.test(q)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Mocambo+Park+Street+Kolkata';
+    return {
+      reply: `📍 **মোকাম্বো (পার্ক স্ট্রিট) / Mocambo (Park Street):**\n\n` +
+        `• **ঠিকানা:** 25B, Park Street, Kolkata (পিটার ক্যাটের কাছেই)।\n` +
+        `• **🚇 নিকটতম মেট্রো:** পার্ক স্ট্রিট মেট্রো স্টেশন (৩ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় পদ:** ডেভিলড ক্র্যাব (Devilled Crab), চিকেন টেট্রাজিনি ও কন্টিনেন্টাল সিজলার।\n\n` +
+        `[🗺️ গুগল ম্যাপে মোকাম্বো খুলুন](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  if (/nizam/i.test(q)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Nizams+Restaurant+New+Market+Kolkata';
+    return {
+      reply: `📍 **নিজামস (নিউ মার্কেট) / Nizam's (New Market):**\n\n` +
+        `• **ঠিকানা:** 23/24, Hogg Street, New Market Area, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** এসপ্ল্যানেড মেট্রো স্টেশন (গেট নং ৫ থেকে ৪ মিনিট হাঁটা)।\n` +
+        `• **ঐতিহ্য:** কলকাতার আসল কাঠি রোলের জন্মস্থান (Original Kathi Roll, Mutton & Beef Roll)।\n\n` +
+        `[🗺️ গুগল ম্যাপে নিজামস খুলুন](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  if (/dacres\s*lane|chitto\s*da/i.test(q)) {
+    const gmapsUrl = 'https://www.google.com/maps/search/Dacres+Lane+Chitto+Babu+Dokan+Kolkata';
+    return {
+      reply: `📍 **ডেকার্স লেন / চিত্ত বাবুর দোকান (Dacres Lane - Chitto Da's):**\n\n` +
+        `• **ঠিকানা:** James Hickey Sarani (Dacres Lane), Esplanade, Kolkata.\n` +
+        `• **🚇 নিকটতম মেট্রো:** এসপ্ল্যানেড বা চাঁদনী চক মেট্রো স্টেশন (৩ মিনিট হাঁটা)।\n` +
+        `• **জনপ্রিয় খাবার:** চিত্তদার চিকেন স্টু ও টোস্ট, ফিশ ফ্রাই, খিচুড়ি ও কফি।\n\n` +
+        `[🗺️ গুগল ম্যাপে ডেকার্স লেন খুলুন](${gmapsUrl})`,
+      gmapsUrl,
+    };
+  }
+
+  // 6. General Food, Restaurants, Biryani, Sweets (amenity request -> give Google Maps)
   if (/\b(food|restaurant|restaurants|biryani|roll|rolls|dhaba|eating|dinner|lunch|breakfast|sweets|mithai|puchka|chaat|cafe|coffee)\b/i.test(q) ||
       /(খাবার|বিরিয়ানি|মিষ্টি|রেস্তোরাঁ|রোল|ফুচকা|खाना|बिरयानी|मिठाई)/i.test(userQuery)) {
     const gmapsUrl = `https://www.google.com/maps/search/restaurants+and+food+near+${encodeURIComponent(loc + ' Kolkata')}`;
@@ -607,7 +680,9 @@ router.post('/chat', async (req, res, next) => {
         if (msg.sender === 'user' && msg.text) {
           contents.push({ role: 'user', parts: [{ text: msg.text }] });
         } else if (msg.sender === 'bot' && (msg.reply || msg.text)) {
-          contents.push({ role: 'model', parts: [{ text: (msg.reply || msg.text).slice(0, 300) }] });
+          if (contents.length > 0) {
+            contents.push({ role: 'model', parts: [{ text: (msg.reply || msg.text).slice(0, 300) }] });
+          }
         }
       }
       contents.push({ role: 'user', parts: [{ text: userQuery }] });
