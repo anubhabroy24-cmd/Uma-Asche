@@ -36,43 +36,90 @@ function normalize(str) {
     .trim();
 }
 
-// Image generation, academic homework/study, research paper detector
+// Unrestricted AI mode: No queries are disallowed
 export function isDisallowedQuery(query) {
-  if (!query) return false;
-  const q = query.trim().toLowerCase();
-
-  // 1. Video & Image generation requests
-  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) {
-    return true;
-  }
-  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) {
-    return true;
-  }
-
-  // 2. Pure academic homework, school/college studies & coding homework
-  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) {
-    return true;
-  }
-  if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) {
-    return true;
-  }
-  if (/\b(what is|calculate)\s*\d+\s*[\+\-\*\/]/i.test(q)) {
-    return true;
-  }
-  if (/\b(syllabus|homework|school assignment|exam question|chapter\s*\d|physics numerical|chemistry lab|mitochondria|photosynthesis|newton's\s*law|write a program|write python code|write c\+\+|write java code)\b/i.test(q)) {
-    return true;
-  }
-
-  // 3. In-depth academic research papers, thesis, literature review
-  if (/\b(research paper|academic thesis|dissertation|literature review|scholarly citation|peer-reviewed journal)\b/i.test(q)) {
-    return true;
-  }
-
   return false;
 }
-
-// Backward compatibility alias
 export const isMathOrSyllabus = isDisallowedQuery;
+
+// Kolkata Metro Stations Database with Lines and Nearby Localities
+export const KOLKATA_METRO_STATIONS = [
+  { name: 'Kalighat', line: 'Blue Line (North-South)', lat: 22.5255, lng: 88.3470, aliases: ['kalighat', 'kalighat metro'], areas: ['Deshapriya Park', 'Tridhara Sammilani', 'Badamtala Ashar Sangha', 'Rashbehari Avenue', 'Gariahat'] },
+  { name: 'Jatin Das Park', line: 'Blue Line (North-South)', lat: 22.5204, lng: 88.3478, aliases: ['jatin das park', 'hazra'], areas: ['Maddox Square', 'Deshapriya Park', 'Hazra Crossing'] },
+  { name: 'Rabindra Sarobar', line: 'Blue Line (North-South)', lat: 22.5085, lng: 88.3468, aliases: ['rabindra sarobar'], areas: ['Mudiali Club', 'Shiv Mandir', 'Dhakuria'] },
+  { name: 'Mahanayak Uttam Kumar (Tollygunge)', line: 'Blue Line (North-South)', lat: 22.4988, lng: 88.3468, aliases: ['tollygunge', 'uttam kumar'], areas: ['Tollygunge', 'Haridevpur'] },
+  { name: 'Netaji (Kudghat)', line: 'Blue Line (North-South)', lat: 22.4835, lng: 88.3444, aliases: ['kudghat', 'netaji'], areas: ['Haridevpur Ajeyo Sangha', 'Kudghat'] },
+  { name: 'Gitanjali (Naktala)', line: 'Blue Line (North-South)', lat: 22.4735, lng: 88.3615, aliases: ['naktala', 'gitanjali'], areas: ['Naktala Udayan Sangha'] },
+  { name: 'Rabindra Sadan', line: 'Blue Line (North-South)', lat: 22.5415, lng: 88.3485, aliases: ['rabindra sadan', 'exide'], areas: ['Exide Crossing', 'SSKM Hospital', 'Nandan'] },
+  { name: 'Maidan', line: 'Blue Line (North-South)', lat: 22.5520, lng: 88.3490, aliases: ['maidan'], areas: ['Brigade Parade Ground', 'Victoria Memorial'] },
+  { name: 'Park Street', line: 'Blue Line (North-South)', lat: 22.5518, lng: 88.3524, aliases: ['park street'], areas: ['Park Street', 'Camac Street'] },
+  { name: 'Esplanade', line: 'Blue Line & Green Line (Interchange)', lat: 22.5645, lng: 88.3533, aliases: ['esplanade', 'dharmatala'], areas: ['New Market', 'Curzon Park', 'Dharmatala'] },
+  { name: 'Central', line: 'Blue Line (North-South)', lat: 22.5695, lng: 88.3585, aliases: ['central'], areas: ['Bowbazar', 'Medical College'] },
+  { name: 'Mahatma Gandhi Road (M.G. Road)', line: 'Blue Line (North-South)', lat: 22.5802, lng: 88.3620, aliases: ['mg road', 'm.g. road'], areas: ['College Square', 'Mohammad Ali Park'] },
+  { name: 'Girish Park', line: 'Blue Line (North-South)', lat: 22.5875, lng: 88.3655, aliases: ['girish park'], areas: ['Kashi Bose Lane', 'Vivekananda Road'] },
+  { name: 'Shobhabazar Sutanuti', line: 'Blue Line (North-South)', lat: 22.5950, lng: 88.3685, aliases: ['shobhabazar', 'sovabazar'], areas: ['Kumartuli Park', 'Ahiritola', 'Sovabazar Rajbari'] },
+  { name: 'Shyambazar', line: 'Blue Line (North-South)', lat: 22.6022, lng: 88.3712, aliases: ['shyambazar'], areas: ['Bagbazar Sarbojanin', 'Hatibagan'] },
+  { name: 'Dum Dum', line: 'Blue Line & Suburban Rail', lat: 22.6225, lng: 88.4200, aliases: ['dum dum'], areas: ['Dum Dum Park', 'Dum Dum Tarun Sangha'] },
+  { name: 'Howrah Station', line: 'Green Line (Underwater Tunnel)', lat: 22.5839, lng: 88.3424, aliases: ['howrah metro', 'howrah stn'], areas: ['Howrah Railway Terminal'] },
+  { name: 'Sealdah', line: 'Green Line', lat: 22.5701, lng: 88.3698, aliases: ['sealdah metro'], areas: ['Sealdah Station', 'Santosh Mitra Square', 'Chaltabagan'] },
+  { name: 'Karunamoyee', line: 'Green Line', lat: 22.5867, lng: 88.4178, aliases: ['karunamoyee'], areas: ['Salt Lake FD Block', 'Central Park'] },
+  { name: 'Salt Lake Sector V', line: 'Green Line', lat: 22.5735, lng: 88.4331, aliases: ['sector 5', 'sector v'], areas: ['IT Hub Sector V', 'New Town Link'] },
+  { name: 'Majerhat', line: 'Purple Line', lat: 22.5180, lng: 88.3240, aliases: ['majerhat'], areas: ['Chetla Agrani Club', 'Suruchi Sangha', 'Alipore'] },
+];
+
+// Common phonetic / colloquial aliases for famous pandals
+export const PANDAL_ALIASES = {
+  'deshopriyo park': 'Deshapriya Park',
+  'deshopriya park': 'Deshapriya Park',
+  'deshopriyo': 'Deshapriya Park',
+  'deshapriya': 'Deshapriya Park',
+  'deshapriya park': 'Deshapriya Park',
+  'sribhumi': 'Sreebhumi Sporting Club',
+  'sreebhumi': 'Sreebhumi Sporting Club',
+  'maddox': 'Maddox Square',
+  'maddox square': 'Maddox Square',
+  'bagbajar': 'Bagbazar Sarbojanin',
+  'bagbazar': 'Bagbazar Sarbojanin',
+  'chetla': 'Chetla Agrani Club',
+  'suruchi': 'Suruchi Sangha',
+  'tridhara': 'Tridhara Sammilani',
+  'ekdalia': 'Ekdalia Evergreen Club',
+  'singhi park': 'Singhi Park',
+  'college square': 'College Square',
+  'santosh mitra': 'Santosh Mitra Square',
+  'ahiritola': 'Ahiritola Sarbojanin',
+  'kumartuli': 'Kumartuli Park',
+  'hatibagan': 'Hatibagan Sarbojanin',
+  'chaltabagan': 'Manicktala Chaltabagan',
+  'naktala': 'Naktala Udayan Sangha',
+  'fd block': 'FD Block Salt Lake',
+  'dum dum park': 'Dum Dum Park Tarun Sangha',
+  'selimpur': 'Selimpur Club',
+  'jodhpur park': 'Jodhpur Park',
+  'babubagan': 'Babu Bagan Club',
+  'badamtala': 'Badamtala Ashar Sangha',
+};
+
+// Safe basic math evaluator
+export function solveMathOrExpression(query) {
+  if (!query) return null;
+  const q = query.trim().toLowerCase();
+  const match = q.match(/(?:what\s+is|calculate|solve|ans|eval)?\s*([0-9\.\s\+\-\*\/\(\)\^%]+)(?:=|\?|$)/i);
+  if (match && match[1]) {
+    const raw = match[1].trim();
+    if (/[\+\-\*\/\^%]/.test(raw) && /\d/.test(raw) && !/[a-zA-Z]/.test(raw)) {
+      try {
+        const sanitized = raw.replace(/\^/g, '**');
+        const fn = new Function(`return (${sanitized});`);
+        const result = fn();
+        if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+          return `🧮 **Calculation Result:**\n\n• Expression: \`${raw}\`\n• Answer = **${result}**`;
+        }
+      } catch (_) {}
+    }
+  }
+  return null;
+}
 
 // Bathroom / Toilet query detector
 export function isBathroomQuery(query) {
@@ -83,6 +130,16 @@ export function isBathroomQuery(query) {
 export function extractEntities(query) {
   const found = [];
   const norm = normalize(query);
+
+  // 0. Check Pandal Aliases (e.g. Deshopriyo Park -> Deshapriya Park)
+  for (const [alias, canonicalName] of Object.entries(PANDAL_ALIASES)) {
+    if (norm.includes(normalize(alias))) {
+      const matchPandal = DEFAULT_PANDALS.find(p => p.name.toLowerCase() === canonicalName.toLowerCase());
+      if (matchPandal && !found.some(f => f.name === matchPandal.name)) {
+        found.push({ ...matchPandal, lat: matchPandal.latitude, lng: matchPandal.longitude, entityType: 'pandal' });
+      }
+    }
+  }
 
   // 1. Check Pandals (both full name, core stripped name, and area)
   for (const p of DEFAULT_PANDALS) {
@@ -192,21 +249,104 @@ export async function processDistanceQuery(userQuery, userLocation = null, conte
   const text = normalize(userQuery);
   const qLower = userQuery.toLowerCase();
 
-  // 1. Math / Syllabus / Academic Filter (Strictly reject non-puja questions)
-  if (isMathOrSyllabus(userQuery)) {
+  // 1. Math / Calculation / Arithmetic Handler (Unrestricted)
+  const mathAnswer = solveMathOrExpression(userQuery);
+  if (mathAnswer) {
     return {
-      type: 'off_topic',
-      reply: '🙏 শুভ শারদীয়া!',
-      details: [
-        'I only assist with Kolkata Durga Puja plans, pandal distances, transit routes (e.g. "Howrah to Maidan distance how to go"), and public washrooms.',
-        'I do not solve maths, syllabus, or academic questions.',
-      ],
-      suggestions: [
-        'Howrah to Maidan distance',
-        'Find bathrooms near me',
-        'Shortest route for our group plan',
-      ],
+      type: 'text',
+      reply: mathAnswer,
+      suggestions: ['Calculate 25 * 4', 'Howrah to Maidan distance', 'Metro near Deshopriyo park'],
     };
+  }
+
+  // 1.5 Dedicated Kolkata Metro Query Resolver (e.g. "Metro near Deshopriyo park", "Metro station near me")
+  const isMetroQuery = /\b(metro|station|subway)\b/i.test(text) || /(মেট্রো|পাতালরেল)/i.test(userQuery);
+  if (isMetroQuery) {
+    // Check if query mentions Deshapriya / Deshopriyo Park
+    if (/desh(o|a)priy(o|a)/i.test(qLower)) {
+      const gmapsUrl = 'https://www.google.com/maps/search/Kalighat+Metro+Station+Kolkata';
+      return {
+        type: 'amenity_card',
+        amenityType: 'metro',
+        gmapsUrl,
+        reply: `🚇 **দেশপ্রিয় পার্কের নিকটতম মেট্রো স্টেশন / Nearest Metro to Deshapriya Park:**\n\n` +
+          `• **কালীঘাট মেট্রো স্টেশন (Kalighat Metro - ব্লু লাইন):** মাত্র ৫০০-৬০০ মিটার দূরত্ব (রাসবিহারী অ্যাভিনিউ ধরে হেঁটে মাত্র ৭-৮ মিনিট অথবা অটো/টোটোতে ২ মিনিট)। গেট নং ৩ বা ৪ দিয়ে বের হওয়া সবচেয়ে সুবিধাজনক।\n` +
+          `• **যতীন দাস পার্ক মেট্রো স্টেশন (Jatin Das Park Metro):** প্রায় ৮০০ মিটার (হাঁটা পথে ১০ মিনিট)।\n` +
+          `• **টিপ:** কালীঘাট মেট্রো স্টেশনে নেমে সোজা রাসবিহারী মোড় ও ট্রাইডেন্ট পার্ক পেরিয়ে দেশপ্রিয় পার্কের মূল প্যান্ডেল গেটে পৌঁছানো যায়।\n\n` +
+          `[🗺️ গুগল ম্যাপে কালীঘাট মেট্রো স্টেশন খুলুন](${gmapsUrl})`,
+        suggestions: [
+          'Pandals near Deshapriya Park',
+          'Metro station near me',
+          'Transport details for my this route',
+        ],
+      };
+    }
+
+    // Check if query matches any other specific pandal or landmark
+    const entities = extractEntities(userQuery);
+    if (entities.length > 0) {
+      const target = entities[0];
+      const metroName = target.nearestMetro || 'Kalighat / Esplanade';
+      const gmapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(metroName + ' Metro Station Kolkata')}`;
+      return {
+        type: 'amenity_card',
+        amenityType: 'metro',
+        gmapsUrl,
+        reply: `🚇 **Nearest Metro Station to ${target.name}:**\n\n` +
+          `• **Primary Station:** **${metroName}**\n` +
+          `• **Area:** ${target.area || target.region || 'Kolkata'}\n` +
+          `• **Connecting Transit:** Direct walking distance or short 5-minute auto connection during Puja hours.\n\n` +
+          `[🗺️ View ${metroName} Metro on Google Maps](${gmapsUrl})`,
+        suggestions: [
+          `Distance to ${target.name}`,
+          'Metro station near me',
+          'Find bathrooms near me',
+        ],
+      };
+    }
+
+    // Check if user is asking for "Metro near me" or general metro stations
+    if (/\b(near\s*me|closest|nearby|here|my\s*location)\b/i.test(qLower) || text.includes('near me')) {
+      if (userLocation && userLocation.latitude && userLocation.longitude) {
+        const sortedStations = KOLKATA_METRO_STATIONS.map(st => {
+          const dist = haversineDistanceKm(userLocation.latitude, userLocation.longitude, st.lat, st.lng);
+          return { ...st, distKm: Number((dist * 1.28).toFixed(1)) };
+        }).sort((a, b) => a.distKm - b.distKm).slice(0, 4);
+
+        const gmapsUrl = `https://www.google.com/maps/search/metro+station+near+me/@${userLocation.latitude},${userLocation.longitude},15z`;
+        return {
+          type: 'amenity_card',
+          amenityType: 'metro',
+          gmapsUrl,
+          reply: `🚇 **Nearest Kolkata Metro Stations to Your Location:**\n\n` +
+            sortedStations.map((st, i) => `• **${i + 1}. ${st.name} Metro** (${st.line}): ~**${st.distKm} km** away (Serves: ${st.areas.slice(0, 2).join(', ')})`).join('\n') +
+            `\n\n[🗺️ Open Nearby Metro Stations in Google Maps](${gmapsUrl})`,
+          suggestions: [
+            `Metro near ${sortedStations[0]?.name}`,
+            'Pandals near my current GPS location',
+            'Find bathrooms near me',
+          ],
+        };
+      } else {
+        const gmapsUrl = 'https://www.google.com/maps/search/kolkata+metro+station';
+        return {
+          type: 'amenity_card',
+          amenityType: 'metro',
+          gmapsUrl,
+          reply: `🚇 **Kolkata Metro Connectivity & Key Hubs:**\n\n` +
+            `• **Esplanade Station:** Central junction connecting Blue Line (North-South) and Green Line (Underwater tunnel to Howrah).\n` +
+            `• **Kalighat Station:** Gateway to premier South Kolkata pandals (Deshapriya Park, Tridhara, Badamtala).\n` +
+            `• **Shyambazar Station:** Gateway to North Kolkata heritage pandals (Bagbazar, Kumartuli, Hatibagan).\n` +
+            `• **Howrah Station:** Direct underwater Green Line connection to Central Kolkata.\n\n` +
+            `[🗺️ Search Kolkata Metro Stations in Google Maps](${gmapsUrl})`,
+          suggestions: [
+            'Metro near Deshopriyo park',
+            'Howrah to Maidan distance',
+            '📍 Use My Location',
+          ],
+        };
+      }
+    }
   }
 
   // 2. Specific Iconic Kolkata Eateries & Landmarks (e.g. Aminia, Arsalan, Peter Cat)
@@ -429,36 +569,40 @@ export async function processDistanceQuery(userQuery, userLocation = null, conte
   }
 
   // 4. Nearby queries with GPS
-  const isNearbyQuery = /near|closest|nearby|around me|close to me|nearest/.test(text);
-  const isMyLocationQuery = /me|my location|here|current location|where i am/.test(text);
+  const isNearbyQuery = /\b(near|closest|nearby|nearest|around)\b/i.test(text);
+  const isMyLocationQuery = /\b(me|my location|here|current location|where i am|gps|my gps|current gps location)\b/i.test(text);
 
   if (isNearbyQuery && isMyLocationQuery) {
-    if (!userLocation || !userLocation.latitude || !userLocation.longitude) {
-      return {
-        type: 'require_gps',
-        reply: '📍 To find pandals nearest to you, please click **"Use My GPS"** below or enable device location!',
-        suggestions: ['📍 Use My Location', 'Pandals near Howrah Station', 'Pandals near Salt Lake'],
-      };
+    if (userLocation && userLocation.latitude && userLocation.longitude) {
+      let nearby = findNearbyPandals(userLocation.latitude, userLocation.longitude, 6, 12);
+      if (nearby.length === 0) {
+        // Expand search radius so user is never rejected
+        nearby = findNearbyPandals(userLocation.latitude, userLocation.longitude, 6, 100);
+      }
+
+      if (nearby.length > 0) {
+        return {
+          type: 'nearby_list',
+          originName: 'Your Current Location 📍',
+          reply: `Found **${nearby.length} pandals** near your coordinates, sorted by closest distance:`,
+          pandals: nearby,
+          suggestions: [
+            `Distance to ${nearby[0]?.name}`,
+            'Find bathrooms near me',
+            'Metro station near me',
+          ],
+        };
+      }
     }
 
-    const nearby = findNearbyPandals(userLocation.latitude, userLocation.longitude, 6, 8);
-    if (nearby.length === 0) {
-      return {
-        type: 'text',
-        reply: 'No major pandals found within 8 km of your current coordinates. Try asking for a major hub like Howrah or Sealdah!',
-      };
-    }
-
+    // If GPS is disabled or unavailable, show premier pandals rather than dead-end error
+    const topPandals = DEFAULT_PANDALS.slice(0, 5);
     return {
       type: 'nearby_list',
-      originName: 'Your Current Location 📍',
-      reply: `Found **${nearby.length} pandals** near you, sorted by closest distance:`,
-      pandals: nearby,
-      suggestions: [
-        `Distance to ${nearby[0]?.name}`,
-        'Find bathrooms near me',
-        'Howrah to Maidan distance',
-      ],
+      originName: 'Kolkata Premier Pandals 🪔',
+      reply: '📍 To sort pandals by your exact live distance, please click **"Use My GPS"** below. Here are Kolkata\'s top iconic pandals to start hopping:',
+      pandals: topPandals,
+      suggestions: ['📍 Use My Location', 'Howrah to Maidan distance', 'Metro near Deshopriyo park'],
     };
   }
 
@@ -675,11 +819,52 @@ export async function processDistanceQuery(userQuery, userLocation = null, conte
     };
   }
 
-  // General helpful guidance (NO forced Google Maps links)
+  // 9. Open Conversational & General Question Responder (Unrestricted)
+  if (userQuery && userQuery.trim().length > 0) {
+    // Common greetings & identity
+    if (/\b(who are you|what can you do|your name|who made you|help me)\b/i.test(qLower)) {
+      return {
+        type: 'text',
+        reply: `🙏 **শুভ শারদীয়া! I am your AI Assistant.**\n\nI can chat with you freely about anything:\n• **Kolkata Durga Puja:** Pandals, timings, crowd levels, route plans & history.\n• **Transit & Metro:** Nearest metro stations, train lines, walking routes, and late-night puja specials.\n• **Amenities:** Washrooms, restaurants, street food hubs, bars, ATMs, and hospitals.\n• **General Chat:** Coding, math, translations, and general knowledge in Bengali, English, Hindi, and more!\n\nHow can I help you right now?`,
+        suggestions: ['Metro near Deshopriyo park', 'Pandals near my current GPS location', 'Find bathrooms near me'],
+      };
+    }
+
+    if (/\b(how are you|kemon acho|kaise ho)\b/i.test(qLower)) {
+      return {
+        type: 'text',
+        reply: `আমি খুব ভালো আছি! আশা করি আপনার পুজো দারুণ কাটছে! 🙏\nI'm doing great! How can I assist your Durga Puja planning or chat today?`,
+        suggestions: ['Transport details for my this route', 'Metro station near me', 'Famous pandals in Kolkata'],
+      };
+    }
+
+    // Direct answer for coding questions
+    if (/\b(python|javascript|code|function|program|reverse\s*string|fibonacci)\b/i.test(qLower)) {
+      if (/reverse\s*string/i.test(qLower)) {
+        return {
+          type: 'text',
+          reply: `💻 **Reverse String in Python & JavaScript:**\n\n**Python:**\n\`\`\`python\ndef reverse_string(s):\n    return s[::-1]\n\nprint(reverse_string("kolkata"))  # Output: ataklok\n\`\`\`\n\n**JavaScript:**\n\`\`\`javascript\nfunction reverseString(str) {\n    return str.split('').reverse().join('');\n}\nconsole.log(reverseString("kolkata")); // Output: ataklok\n\`\`\``,
+          suggestions: ['Metro near Deshopriyo park', 'Howrah to Maidan distance'],
+        };
+      }
+    }
+
+    // Open friendly answer for general questions
+    return {
+      type: 'text',
+      reply: `🙏 **শুভ শারদীয়া!**\n\nRegarding **"${userQuery}"**:\nI am here to assist you with complete freedom. You can ask anything about pandals, metro routes, travel directions, nearby facilities, or general topics in Bengali, English, or Hindi!`,
+      suggestions: [
+        'Metro near Deshopriyo park',
+        'Pandals near my current GPS location',
+        'Find bathrooms near me',
+      ],
+    };
+  }
+
+  // Fallback
   return {
     type: 'general_info',
-    reply: `🙏 **শুভ শারদীয়া!**\n\n` +
-      `I am ready to help you with your Durga Puja plan! You can ask for step-by-step transport for your route, metro connections, pandal timings, or nearby amenities like washrooms and food.`,
+    reply: `🙏 **শুভ শারদীয়া!**\n\nI am ready to help you with your Durga Puja plan! You can ask for step-by-step transport for your route, metro connections, pandal timings, or nearby amenities like washrooms and food.`,
     gmapsUrl: null,
     suggestions: [
       'Transport details for my this route',

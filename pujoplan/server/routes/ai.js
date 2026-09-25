@@ -64,24 +64,9 @@ function isTransportQuery(query = '') {
 
 
 /**
- * Filter out image/video creation requests, school/college homework/syllabus studies, and academic research papers.
+ * Unrestricted mode: No queries are disallowed
  */
 function isDisallowedQuery(query = '') {
-  const q = query.trim().toLowerCase();
-
-  // 1. Video & Image generation
-  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) return true;
-  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) return true;
-
-  // 2. Pure academic homework, school/college syllabus & coding homework
-  if (/\b(solve|equation|derivative|integral|integrate|algebra|calculus|trigonometry|pythagoras|logarithm|fraction)\b/i.test(q)) return true;
-  if (/\b\d+\s*[\+\-\*\/\^%]\s*\d+\b/.test(q)) return true;
-  if (/\b(what is|calculate)\s*\d+\s*[\+\-\*\/]/i.test(q)) return true;
-  if (/\b(syllabus|homework|school assignment|exam question|chapter\s*\d|physics numerical|chemistry lab|mitochondria|photosynthesis|newton's\s*law|write a program|write python code|write c\+\+|write java code)\b/i.test(q)) return true;
-
-  // 3. Academic research papers, thesis
-  if (/\b(research paper|academic thesis|dissertation|literature review|scholarly citation|peer-reviewed journal)\b/i.test(q)) return true;
-
   return false;
 }
 
@@ -312,6 +297,53 @@ function generateComprehensiveAnswer(userQuery, context = {}) {
       return {
         reply: 'Hello! 🙏 শুভ শারদীয়া! I am your Uma Asche AI Assistant. How can I help you with your pandals, step-by-step route transport, or Kolkata travel today?',
         gmapsUrl: null,
+      };
+    }
+  }
+
+  // 1. Math / Calculation solver (Unrestricted)
+  const mathMatch = q.match(/(?:what\s+is|calculate|solve|eval)?\s*([0-9\.\s\+\-\*\/\(\)\^%]+)(?:=|\?|$)/i);
+  if (mathMatch && mathMatch[1]) {
+    const rawExpr = mathMatch[1].trim();
+    if (/[\+\-\*\/\^%]/.test(rawExpr) && /\d/.test(rawExpr) && !/[a-zA-Z]/.test(rawExpr)) {
+      try {
+        const sanitized = rawExpr.replace(/\^/g, '**');
+        const fn = new Function(`return (${sanitized});`);
+        const result = fn();
+        if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+          return {
+            reply: `🧮 **Calculation Result:**\n\n• Expression: \`${rawExpr}\`\n• Answer = **${result}**`,
+            gmapsUrl: null,
+          };
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 1.2 Dedicated Metro Query Handler (e.g. "Metro near Deshopriyo park", "Metro station near me")
+  if (/\b(metro|station|subway)\b/i.test(q) || /(মেট্রো|পাতালরেল)/i.test(userQuery)) {
+    if (/desh(o|a)priy(o|a)/i.test(q)) {
+      const gmapsUrl = 'https://www.google.com/maps/search/Kalighat+Metro+Station+Kolkata';
+      return {
+        reply: `🚇 **দেশপ্রিয় পার্কের নিকটতম মেট্রো স্টেশন / Nearest Metro to Deshapriya Park:**\n\n` +
+          `• **কালীঘাট মেট্রো স্টেশন (Kalighat Metro - ব্লু লাইন):** মাত্র ৫০০-৬০০ মিটার দূরত্ব (রাসবিহারী অ্যাভিনিউ ধরে হেঁটে মাত্র ৭-৮ মিনিট অথবা অটো/টোটোতে ২ মিনিট)। গেট নং ৩ বা ৪ দিয়ে বের হওয়া সবচেয়ে সুবিধাজনক।\n` +
+          `• **যতীন দাস পার্ক মেট্রো স্টেশন (Jatin Das Park Metro):** প্রায় ৮০০ মিটার (হাঁটা পথে ১০ মিনিট)।\n` +
+          `• **টিপ:** কালীঘাট মেট্রো স্টেশনে নেমে সোজা রাসবিহারী মোড় ও ট্রাইডেন্ট পার্ক পেরিয়ে দেশপ্রিয় পার্কের মূল প্যান্ডেল গেটে পৌঁছানো যায়।\n\n` +
+          `[🗺️ গুগল ম্যাপে কালীঘাট মেট্রো স্টেশন খুলুন](${gmapsUrl})`,
+        gmapsUrl,
+      };
+    }
+
+    if (/\b(near\s*me|closest|nearby|here|my\s*location)\b/i.test(q)) {
+      const gmapsUrl = 'https://www.google.com/maps/search/kolkata+metro+station';
+      return {
+        reply: `🚇 **Kolkata Metro Key Hubs & Connectivity:**\n\n` +
+          `• **Esplanade:** Central junction connecting Blue Line (North-South) and Green Line (Underwater Howrah-Salt Lake).\n` +
+          `• **Kalighat / Jatin Das Park:** Serves South Kolkata pandals (Deshapriya Park, Tridhara, Maddox Square, Badamtala).\n` +
+          `• **Shyambazar / Sovabazar:** Serves North Kolkata heritage pandals (Bagbazar, Kumartuli, Ahiritola).\n` +
+          `• **Howrah Station:** Direct underwater Green Line link from Howrah.\n\n` +
+          `[🗺️ Search Kolkata Metro Stations in Google Maps](${gmapsUrl})`,
+        gmapsUrl,
       };
     }
   }
@@ -591,7 +623,8 @@ function buildSystemInstruction(context = {}) {
     locationContext = `\nUser's current GPS location: Lat ${Number(userLocation.latitude).toFixed(4)}, Lng ${Number(userLocation.longitude).toFixed(4)} (Kolkata).`;
   }
 
-  return `You are Uma Asche AI — powered by Google Gemini 3 — the premier Kolkata Durga Puja & Transport Assistant.
+  return `You are Uma Asche AI — an unrestricted, intelligent, helpful AI assistant powered by Google Gemini.
+You have FULL ACCESS to chat about everything with the user without any restrictions or refusals (math, coding, science, general chat, Durga Puja, metro, routes, etc.). Answer everything directly in the user's language.
 
 CRITICAL RULES:
 1. MULTI-LANGUAGE FLUENCY:
@@ -648,19 +681,7 @@ router.post('/chat', async (req, res, next) => {
       return res.status(400).json({ error: 'Query or message is required.' });
     }
 
-    // 1. Instant Filter for Image/Video Gen, School Homework, Academic Research Papers
-    if (isDisallowedQuery(userQuery)) {
-      return res.json({
-        reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Travel Assistant. I cannot generate images/videos, solve school/college homework, or write academic research papers. Feel free to ask me anything else about pandals, routes, food, toilets, bars, metro, places to visit, and festive guides in any language!',
-        gmapsUrl: null,
-        modelUsed: 'instant-rule',
-        source: 'gemini',
-        status: 'success',
-        cached: true,
-      });
-    }
-
-    // 2. In-memory Cache Check (< 2ms)
+    // 1. In-memory Cache Check (< 2ms)
     const cacheKey = normalizeKey(userQuery);
     const cached = responseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {

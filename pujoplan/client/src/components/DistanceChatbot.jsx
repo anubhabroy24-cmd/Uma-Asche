@@ -4,7 +4,7 @@ import {
   ExternalLink, RotateCcw, Footprints, Car,
   ChevronDown, Flame, Sparkles
 } from 'lucide-react';
-import { processDistanceQuery, isMathOrSyllabus } from '../utils/distanceBotEngine';
+import { processDistanceQuery } from '../utils/distanceBotEngine';
 import { getReliableCurrentLocation } from '../services/routingService';
 import { sendGeminiMessage } from '../services/geminiService';
 import './DistanceChatbot.css';
@@ -182,22 +182,7 @@ export default function DistanceChatbot({
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
 
-    // 1. Instant 0ms Filter for Image Gen / School Homework / Research Papers
-    if (isMathOrSyllabus(text)) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: 'bot-' + Date.now(),
-          sender: 'bot',
-          type: 'text',
-          reply: '🙏 শুভ শারদীয়া! I am your Durga Puja & Kolkata Guide Assistant. I cannot create images, solve school homework, or write academic research papers. Feel free to ask me anything about pandals, routes, food, metro, places to visit, and festive guides in any language!',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-      return;
-    }
-
-    // 2. Instant 0ms Client Cache Hit
+    // Instant 0ms Client Cache Hit
     const normKey = text.toLowerCase().trim();
     if (localCacheRef.current.has(normKey)) {
       const cachedMsg = localCacheRef.current.get(normKey);
