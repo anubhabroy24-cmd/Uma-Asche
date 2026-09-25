@@ -5,12 +5,13 @@
 import api from './api';
 
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
   'gemini-3-flash-preview',
+  'gemini-3.6-flash',
+  'gemini-3.8-flash',
 ];
 
 
-const DEFAULT_CLIENT_KEY = (typeof atob === 'function' ? atob('QUl6YVN5QmtFTG9sRlZkU2toMU9iMkJPd3o3TW81R3Z0VzIzUHhF') : '');
+const DEFAULT_CLIENT_KEY = (typeof atob === 'function' ? atob('QVEuQWI4Uk42SWgzaGRHZG5jampRdWozZXF0X3dqSWl1cTFva1A5ZEU0LXY1TmNrLS03aVE=') : '');
 
 /**
  * Retrieve active Gemini API key if present in client environment
