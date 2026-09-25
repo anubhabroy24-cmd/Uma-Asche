@@ -36,8 +36,19 @@ function normalize(str) {
     .trim();
 }
 
-// Unrestricted AI mode: No queries are disallowed
+// Restrict ONLY image and video generation requests
 export function isDisallowedQuery(query) {
+  if (!query) return false;
+  const q = query.trim().toLowerCase();
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) {
+    return true;
+  }
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) {
+    return true;
+  }
+  if (/(ছবি তৈরি|ছবি বানাও|ভিডিও বানাও|চিত্র আঁকো|ছবি আঁকো|চিত্র তৈরি|চিত্র বানাও|चित्र बनाओ|फोटो बनाओ|वीडियो बनाओ)/i.test(q)) {
+    return true;
+  }
   return false;
 }
 export const isMathOrSyllabus = isDisallowedQuery;
@@ -248,6 +259,15 @@ export function findNearbyPandals(targetLat, targetLng, maxCount = 5, maxRadiusK
 export async function processDistanceQuery(userQuery, userLocation = null, context = {}) {
   const text = normalize(userQuery);
   const qLower = userQuery.toLowerCase();
+
+  // 0. Image & Video Generation restriction only
+  if (isDisallowedQuery(userQuery)) {
+    return {
+      type: 'text',
+      reply: '🙏 শুভ শারদীয়া! I cannot generate or create images and videos as I am a text-based AI assistant. Feel free to ask me anything else about routes, pandals, metro, food, math, coding, or any general question!',
+      suggestions: ['Metro near Deshopriyo park', 'Pandals near my current GPS location', 'Find bathrooms near me'],
+    };
+  }
 
   // 1. Math / Calculation / Arithmetic Handler (Unrestricted)
   const mathAnswer = solveMathOrExpression(userQuery);

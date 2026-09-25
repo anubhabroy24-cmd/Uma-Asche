@@ -64,9 +64,22 @@ function isTransportQuery(query = '') {
 
 
 /**
- * Unrestricted mode: No queries are disallowed
+ * Restrict ONLY image and video generation requests
  */
 function isDisallowedQuery(query = '') {
+  const q = query.trim().toLowerCase();
+
+  // 1. Video & Image generation requests
+  if (/\b(generate|create|draw|make|render|paint|design)\s+(an?\s+)?(image|picture|photo|illustration|drawing|artwork|logo|wallpaper|poster|graphic|video|animation|clip)\b/i.test(q)) {
+    return true;
+  }
+  if (/\b(dall-?e|midjourney|stable\s*diffusion|text\s*to\s*image|text\s*to\s*video|sora|runwayml|imagine\s+a)\b/i.test(q)) {
+    return true;
+  }
+  if (/(ছবি তৈরি|ছবি বানাও|ভিডিও বানাও|চিত্র আঁকো|ছবি আঁকো|চিত্র তৈরি|চিত্র বানাও|चित्र बनाओ|फोटो बनाओ|वीडियो बनाओ)/i.test(q)) {
+    return true;
+  }
+
   return false;
 }
 
@@ -624,7 +637,7 @@ function buildSystemInstruction(context = {}) {
   }
 
   return `You are Uma Asche AI — an unrestricted, intelligent, helpful AI assistant powered by Google Gemini.
-You have FULL ACCESS to chat about everything with the user without any restrictions or refusals (math, coding, science, general chat, Durga Puja, metro, routes, etc.). Answer everything directly in the user's language.
+You have FULL ACCESS to chat about everything with the user without restrictions (math, coding, science, general chat, Durga Puja, metro, routes, etc.). The ONLY restriction is image/video generation: you cannot create, draw, or render images or videos; if asked to generate an image or video, politely state that you are a text-only assistant and cannot create media. Answer everything directly in the user's language.
 
 CRITICAL RULES:
 1. MULTI-LANGUAGE FLUENCY:
@@ -681,7 +694,19 @@ router.post('/chat', async (req, res, next) => {
       return res.status(400).json({ error: 'Query or message is required.' });
     }
 
-    // 1. In-memory Cache Check (< 2ms)
+    // 1. Restrict ONLY image and video generation requests
+    if (isDisallowedQuery(userQuery)) {
+      return res.json({
+        reply: '🙏 শুভ শারদীয়া! I cannot generate or create images and videos as I am a text-based AI assistant. Feel free to ask me anything else about pandals, routes, metro, food, math, coding, or any general question!',
+        gmapsUrl: null,
+        modelUsed: 'instant-rule',
+        source: 'gemini',
+        status: 'success',
+        cached: true,
+      });
+    }
+
+    // 2. In-memory Cache Check (< 2ms)
     const cacheKey = normalizeKey(userQuery);
     const cached = responseCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {

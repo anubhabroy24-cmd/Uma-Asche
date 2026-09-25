@@ -4,7 +4,7 @@ import {
   ExternalLink, RotateCcw, Footprints, Car,
   ChevronDown, Flame, Sparkles
 } from 'lucide-react';
-import { processDistanceQuery } from '../utils/distanceBotEngine';
+import { processDistanceQuery, isDisallowedQuery } from '../utils/distanceBotEngine';
 import { getReliableCurrentLocation } from '../services/routingService';
 import { sendGeminiMessage } from '../services/geminiService';
 import './DistanceChatbot.css';
@@ -181,6 +181,21 @@ export default function DistanceChatbot({
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+
+    // 0ms Filter ONLY for Image and Video Generation requests
+    if (isDisallowedQuery(text)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'bot-' + Date.now(),
+          sender: 'bot',
+          type: 'text',
+          reply: '🙏 শুভ শারদীয়া! I cannot generate or create images and videos as I am a text-based AI assistant. Feel free to ask me anything else about pandals, routes, food, metro, coding, math, or festive guides!',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+      return;
+    }
 
     // Instant 0ms Client Cache Hit
     const normKey = text.toLowerCase().trim();
