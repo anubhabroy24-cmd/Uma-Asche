@@ -110,15 +110,11 @@ function getMsgSender(msg, currentUser, isMe) {
   return { name, profileImage };
 }
 
-// Compress selected photo before upload to keep chat fast and ensure strictly under 1MB
+// Compress and scale photo smoothly before upload to keep chat fast and responsive
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       return reject(new Error('Please select an image file.'));
-    }
-    const ONE_MB = 1024 * 1024;
-    if (file.size > ONE_MB) {
-      return reject(new Error('Picture must be under 1 MB in size.'));
     }
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -126,7 +122,7 @@ function compressImage(file) {
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
-          const MAX_DIM = 1200;
+          const MAX_DIM = 1600;
           let { width, height } = img;
           if (width > height) {
             if (width > MAX_DIM) {
@@ -144,13 +140,7 @@ function compressImage(file) {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          let quality = 0.82;
-          let dataUrl = canvas.toDataURL('image/jpeg', quality);
-          // If still over 1MB, progressively compress until under 1MB
-          while (dataUrl.length > ONE_MB * 1.33 && quality > 0.25) {
-            quality -= 0.15;
-            dataUrl = canvas.toDataURL('image/jpeg', quality);
-          }
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           resolve(dataUrl);
         } catch (err) {
           reject(err);
@@ -450,16 +440,6 @@ export default function GroupChat({ groupId, currentUser }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Must be under 1 MB
-    const ONE_MB = 1024 * 1024;
-    if (file.size > ONE_MB) {
-      alert('Picture must be under 1 MB in size. Please select a smaller photo.');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      return;
-    }
-
     try {
       setUploadingPhoto(true);
       setError('');
@@ -470,8 +450,8 @@ export default function GroupChat({ groupId, currentUser }) {
       });
     } catch (err) {
       console.warn('Image processing error:', err);
-      setError(err.message || 'Failed to attach image. Please ensure it is under 1MB.');
-      alert(err.message || 'Picture must be under 1 MB.');
+      setError(err.message || 'Failed to attach image.');
+      alert(err.message || 'Failed to attach image.');
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) {

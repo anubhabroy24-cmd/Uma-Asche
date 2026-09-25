@@ -762,12 +762,6 @@ async function sendGroupMessage(req, res, next) {
     const { text, type, imageUrl } = req.body;
     const user = req.user;
 
-    // Strictly enforce 1 MB limit for image uploads
-    if (imageUrl && typeof imageUrl === 'string') {
-      if (imageUrl.length > 1.4 * 1024 * 1024) {
-        return res.status(400).json({ error: 'Picture must be under 1 MB in size.' });
-      }
-    }
 
     const message = await Message.create({
       id: 'msg_' + Date.now() + '_' + nanoid(6),
